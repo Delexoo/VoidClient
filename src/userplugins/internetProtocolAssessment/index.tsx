@@ -1168,7 +1168,7 @@ function ingestFlowGeo(conn: CapturedConnection) {
     const key = conn.dst.toLowerCase();
     const existing = geoByKey.get(key);
     if (!existing || (existing.latitude == null && geo.latitude != null))
-        geoByKey.set(key, geo);
+        rememberGeoUi(key, geo);
 }
 
 async function ensureGeo(raw: string) {
@@ -1182,7 +1182,7 @@ async function ensureGeo(raw: string) {
     try {
         const res = await helper.lookupGeo(key) as (GeoInfo & { ok?: boolean; }) | undefined;
         if (!res?.ok) return;
-        geoByKey.set(lookup, {
+        rememberGeoUi(lookup, {
             ip: present(res.ip, key),
             location: present(res.location, "Unknown"),
             city: res.city ?? null,
@@ -1420,8 +1420,17 @@ const EMPTY_STATS: SelfStats = {
     participants: []
 };
 
+const GEO_UI_MAX = 64;
 const geoByKey = new Map<string, GeoInfo>();
 const geoInFlight = new Set<string>();
+
+function rememberGeoUi(key: string, geo: GeoInfo) {
+    if (geoByKey.size >= GEO_UI_MAX && !geoByKey.has(key)) {
+        const oldest = geoByKey.keys().next().value;
+        if (oldest) geoByKey.delete(oldest);
+    }
+    geoByKey.set(key, geo);
+}
 
 let stats: SelfStats = EMPTY_STATS;
 let pingHistory: number[] = [];
@@ -1433,9 +1442,9 @@ function numOrNull(v: unknown): number | null {
 
 function pushHistory(arr: number[], value: number | null) {
     if (value == null || !Number.isFinite(value)) return arr;
-    const next = [...arr, value];
-    if (next.length > HISTORY_LEN) next.shift();
-    return next;
+    arr.push(value);
+    if (arr.length > HISTORY_LEN) arr.shift();
+    return arr;
 }
 
 function scheduleUiSave() {

@@ -13,7 +13,7 @@ static class Program
     static void Main()
     {
         ApplicationConfiguration.Initialize();
-        Application.SetHighDpiMode(HighDpiMode.SystemAware);
+        Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.Run(new InstallerForm());
     }
 }
@@ -21,7 +21,8 @@ static class Program
 sealed class RoundButton : Control
 {
     public Color HoverColor { get; set; }
-    public int CornerRadius { get; set; } = 10;
+    public int CornerRadius { get; set; } = 8;
+    public bool Ghost { get; set; }
     bool _hover;
     bool _pressed;
 
@@ -36,7 +37,19 @@ sealed class RoundButton : Control
 
     protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); base.OnMouseEnter(e); }
     protected override void OnMouseLeave(EventArgs e) { _hover = false; _pressed = false; Invalidate(); base.OnMouseLeave(e); }
+    protected override void OnGotFocus(EventArgs e) { Invalidate(); base.OnGotFocus(e); }
+    protected override void OnLostFocus(EventArgs e) { Invalidate(); base.OnLostFocus(e); }
     protected override void OnMouseDown(MouseEventArgs e) { _pressed = true; Invalidate(); base.OnMouseDown(e); }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (Enabled && (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Space))
+        {
+            e.Handled = true;
+            OnClick(EventArgs.Empty);
+            return;
+        }
+        base.OnKeyDown(e);
+    }
     protected override void OnMouseUp(MouseEventArgs e)
     {
         var wasPressed = _pressed;
@@ -54,21 +67,40 @@ sealed class RoundButton : Control
         e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
         var rect = ClientRectangle;
         rect.Inflate(-1, -1);
-        var fill = !Enabled ? Color.FromArgb(60, BackColor) :
-            _pressed ? ControlPaint.Dark(BackColor) :
-            _hover ? HoverColor : BackColor;
+        Color fill;
+        Color text = ForeColor;
+        if (Ghost)
+        {
+            fill = !Enabled ? Color.Transparent :
+                _pressed ? Color.FromArgb(28, 255, 255, 255) :
+                _hover ? Color.FromArgb(16, 255, 255, 255) : Color.Transparent;
+            text = !Enabled ? Color.FromArgb(110, 116, 128) :
+                _hover ? Color.White : ForeColor;
+        }
+        else
+        {
+            fill = !Enabled ? Color.FromArgb(72, 78, 92) :
+                _pressed ? ControlPaint.Dark(BackColor) :
+                _hover ? HoverColor : BackColor;
+        }
 
         using var path = RoundRect(rect, CornerRadius);
-        using var brush = new SolidBrush(fill);
-        e.Graphics.FillPath(brush, path);
+        using (var brush = new SolidBrush(fill))
+            e.Graphics.FillPath(brush, path);
+
+        if (Focused && Enabled)
+        {
+            using var pen = new Pen(Color.FromArgb(180, 198, 208, 255), 1.5f);
+            e.Graphics.DrawPath(pen, path);
+        }
 
         TextRenderer.DrawText(
             e.Graphics,
             Text,
             Font,
             rect,
-            ForeColor,
-            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
+            text,
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
     }
 
     static GraphicsPath RoundRect(Rectangle bounds, int radius)
@@ -99,7 +131,7 @@ sealed class ProgressPill : Control
     {
         SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer |
                  ControlStyles.ResizeRedraw | ControlStyles.UserPaint | ControlStyles.Opaque, true);
-        Height = 10;
+        Height = 6;
         BackColor = Color.FromArgb(43, 45, 49);
     }
 
@@ -139,9 +171,8 @@ sealed class ProgressPill : Control
 sealed class InstallerForm : Form
 {
     static readonly Color Bg = Color.FromArgb(30, 31, 34);
-    static readonly Color Card = Color.FromArgb(43, 45, 49);
-    static readonly Color LogBg = Color.FromArgb(30, 31, 34);
-    static readonly Color Track = Color.FromArgb(24, 25, 28);
+    static readonly Color LogBg = Color.FromArgb(20, 21, 24);
+    static readonly Color Track = Color.FromArgb(58, 62, 70);
     static readonly Color Muted = Color.FromArgb(148, 155, 164);
     static readonly Color Soft = Color.FromArgb(219, 222, 225);
     static readonly Color Accent = Color.FromArgb(88, 101, 242);
@@ -149,12 +180,13 @@ sealed class InstallerForm : Form
     static readonly Color Success = Color.FromArgb(35, 165, 89);
     static readonly Color Danger = Color.FromArgb(237, 66, 69);
 
-    readonly Label _eyebrow;
-    readonly Label _title;
+    readonly Label _version;
     readonly Label _step;
     readonly Label _status;
     readonly Label _pct;
     readonly ProgressPill _bar;
+    readonly Panel _body;
+    readonly Panel _logWrap;
     readonly TextBox _log;
     readonly RoundButton _primary;
     readonly RoundButton _secondary;
@@ -162,12 +194,18 @@ sealed class InstallerForm : Form
     readonly string _toolsDir;
     Process? _proc;
     bool _running;
+    bool _detailsOpen;
     string? _lastCloneLine;
+    const int WindowWidth = 440;
+    const int CompactHeight = 236;
+    const int DetailsHeight = 460;
 
     public InstallerForm()
     {
-        Text = "Vencord + Delexo Plugins";
-        ClientSize = new Size(520, 428);
+        AutoScaleMode = AutoScaleMode.Dpi;
+        Text = "Vencord";
+        Font = new Font("Segoe UI", 10f);
+        ClientSize = new Size(WindowWidth, CompactHeight);
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedSingle;
         MaximizeBox = false;
@@ -175,7 +213,6 @@ sealed class InstallerForm : Form
         ShowInTaskbar = true;
         BackColor = Bg;
         ForeColor = Soft;
-        Font = new Font("Segoe UI", 9f);
         DoubleBuffered = true;
         Padding = new Padding(0);
 
@@ -184,159 +221,125 @@ sealed class InstallerForm : Form
             "DelexooVencord");
         _toolsDir = Path.Combine(_installRoot, "tools");
 
-        var accentBar = new Panel
-        {
-            Dock = DockStyle.Top,
-            Height = 4,
-            BackColor = Accent
-        };
-
         var header = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 70,
+            Height = 64,
             BackColor = Bg
         };
 
-        _eyebrow = new Label
+        var title = new Label
         {
-            Text = $"INSTALLER v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.8.3"}",
+            Text = "Vencord",
             AutoSize = true,
-            Font = new Font("Segoe UI", 7.5f, FontStyle.Bold),
-            ForeColor = Accent,
-            Location = new Point(20, 12),
-            BackColor = Bg
-        };
-
-        _title = new Label
-        {
-            Text = "Vencord + Delexo Plugins",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 16f),
+            Font = new Font("Segoe UI Semibold", 18f),
             ForeColor = Color.White,
-            Location = new Point(18, 30),
+            Location = new Point(28, 18),
             BackColor = Bg
         };
-        header.Controls.Add(_eyebrow);
-        header.Controls.Add(_title);
+
+        _version = new Label
+        {
+            Text = $"v{Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.8.4"}",
+            AutoSize = true,
+            Font = new Font("Segoe UI", 9f),
+            ForeColor = Muted,
+            BackColor = Bg
+        };
+        header.Controls.Add(title);
+        header.Controls.Add(_version);
+        header.Resize += (_, _) =>
+        {
+            _version.Left = header.ClientSize.Width - 28 - _version.Width;
+            _version.Top = 26;
+        };
 
         var footer = new Panel
         {
             Dock = DockStyle.Bottom,
-            Height = 58,
+            Height = 72,
             BackColor = Bg
         };
 
         _primary = new RoundButton
         {
-            Text = "Install / update",
-            Location = new Point(20, 8),
-            Size = new Size(168, 38),
+            Text = "Please wait",
+            Location = new Point(28, 14),
+            Size = new Size(148, 44),
             BackColor = Accent,
             HoverColor = AccentHover,
             ForeColor = Color.White,
-            CornerRadius = 10,
-            Font = new Font("Segoe UI Semibold", 9.5f)
+            CornerRadius = 8,
+            Font = new Font("Segoe UI Semibold", 10f),
+            Enabled = false
         };
         _primary.Click += async (_, _) => await RunAsync();
 
         _secondary = new RoundButton
         {
-            Text = "Open log",
-            Location = new Point(196, 8),
-            Size = new Size(108, 38),
-            BackColor = Color.FromArgb(48, 50, 58),
-            HoverColor = Color.FromArgb(64, 66, 76),
-            ForeColor = Color.White,
-            CornerRadius = 10,
-            Font = new Font("Segoe UI Semibold", 9.5f)
+            Text = "Details",
+            Location = new Point(188, 14),
+            Size = new Size(100, 44),
+            Ghost = true,
+            BackColor = Bg,
+            ForeColor = Muted,
+            CornerRadius = 8,
+            Font = new Font("Segoe UI Semibold", 10f)
         };
-        _secondary.Click += (_, _) =>
-        {
-            var log = Path.Combine(_toolsDir, "update-vencord.log");
-            if (File.Exists(log))
-                Process.Start(new ProcessStartInfo(log) { UseShellExecute = true });
-            else
-                AppendLog("No log yet.");
-        };
+        _secondary.Click += (_, _) => ShowDetails(!_detailsOpen);
         footer.Controls.Add(_primary);
         footer.Controls.Add(_secondary);
 
-        var body = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Bg,
-            Padding = new Padding(20, 8, 20, 4)
-        };
-
-        var cardHost = new Panel
+        _body = new Panel
         {
             Dock = DockStyle.Fill,
             BackColor = Bg
         };
-        cardHost.Paint += (_, e) =>
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            var r = new Rectangle(0, 0, cardHost.Width - 1, cardHost.Height - 1);
-            using var path = RoundRect(r, 12);
-            using var fill = new SolidBrush(Card);
-            e.Graphics.FillPath(fill, path);
-        };
 
         _step = new Label
         {
-            Text = "Ready",
-            AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 12f),
+            Text = "Installing",
+            AutoSize = false,
+            Font = new Font("Segoe UI Semibold", 13f),
             ForeColor = Color.White,
-            Location = new Point(16, 14),
-            BackColor = Card
+            Location = new Point(28, 8),
+            Size = new Size(280, 26),
+            BackColor = Bg
         };
 
         _pct = new Label
         {
             Text = "0%",
             AutoSize = true,
-            Font = new Font("Segoe UI Semibold", 9.5f),
-            ForeColor = Soft,
-            Location = new Point(430, 18),
-            BackColor = Card
+            Font = new Font("Segoe UI Semibold", 11f),
+            ForeColor = Muted,
+            BackColor = Bg
         };
 
         _status = new Label
         {
-            Text = "One click to install or update",
+            Text = "Discord will close, then open again.",
             AutoSize = false,
-            Size = new Size(440, 20),
-            Font = new Font("Segoe UI", 9f),
+            Size = new Size(384, 40),
+            Font = new Font("Segoe UI", 10f),
             ForeColor = Muted,
-            Location = new Point(16, 40),
-            BackColor = Card
+            Location = new Point(28, 36),
+            BackColor = Bg
         };
 
         _bar = new ProgressPill
         {
-            Location = new Point(16, 66),
-            Size = new Size(448, 10),
-            BackColor = Card,
+            Location = new Point(28, 86),
+            Size = new Size(384, 6),
+            BackColor = Bg,
             FillColor = Accent,
             TrackColor = Track
         };
 
-        var logWrap = new Panel
+        _logWrap = new Panel
         {
-            Location = new Point(16, 86),
-            Size = new Size(448, 178),
-            BackColor = Card
-        };
-        logWrap.Paint += (_, e) =>
-        {
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-            e.Graphics.PixelOffsetMode = PixelOffsetMode.HighQuality;
-            using var path = RoundRect(new Rectangle(0, 0, logWrap.Width - 1, logWrap.Height - 1), 10);
-            using var fill = new SolidBrush(LogBg);
-            e.Graphics.FillPath(fill, path);
+            BackColor = LogBg,
+            Visible = false
         };
 
         var mono = FontFamily.Families.Any(f => f.Name == "Cascadia Mono") ? "Cascadia Mono" : "Consolas";
@@ -346,41 +349,26 @@ sealed class InstallerForm : Form
             ReadOnly = true,
             BorderStyle = BorderStyle.None,
             ScrollBars = ScrollBars.Vertical,
-            Location = new Point(12, 10),
-            Size = new Size(424, 158),
+            Dock = DockStyle.Fill,
             BackColor = LogBg,
-            ForeColor = Soft,
-            Font = new Font(mono, 8f)
+            ForeColor = Muted,
+            Font = new Font(mono, 9f),
+            TabStop = false
         };
         _log.HandleCreated += (_, _) => TryDarkScroll(_log.Handle);
-        logWrap.Controls.Add(_log);
+        _logWrap.Controls.Add(_log);
+        _logWrap.Padding = new Padding(12, 10, 4, 10);
 
-        cardHost.Controls.Add(_step);
-        cardHost.Controls.Add(_pct);
-        cardHost.Controls.Add(_status);
-        cardHost.Controls.Add(_bar);
-        cardHost.Controls.Add(logWrap);
-        body.Controls.Add(cardHost);
+        _body.Controls.Add(_logWrap);
+        _body.Controls.Add(_bar);
+        _body.Controls.Add(_status);
+        _body.Controls.Add(_pct);
+        _body.Controls.Add(_step);
+        _body.Resize += (_, _) => LayoutBody();
 
-        void LayoutCard()
-        {
-            var pad = 16;
-            var innerW = Math.Max(120, cardHost.ClientSize.Width - pad * 2);
-            _status.Width = innerW;
-            _bar.Width = innerW;
-            var pctW = TextRenderer.MeasureText(_pct.Text, _pct.Font).Width;
-            _pct.Left = pad + innerW - pctW;
-            logWrap.Location = new Point(pad, 84);
-            logWrap.Size = new Size(innerW, Math.Max(80, cardHost.ClientSize.Height - 100));
-            _log.Size = new Size(Math.Max(40, logWrap.Width - 24), Math.Max(40, logWrap.Height - 20));
-        }
-        cardHost.Resize += (_, _) => LayoutCard();
-        Load += (_, _) => LayoutCard();
-
-        Controls.Add(body);
+        Controls.Add(_body);
         Controls.Add(footer);
         Controls.Add(header);
-        Controls.Add(accentBar);
 
         HandleCreated += (_, _) =>
         {
@@ -388,6 +376,9 @@ sealed class InstallerForm : Form
             if (_log.IsHandleCreated) TryDarkScroll(_log.Handle);
         };
 
+        ClientSize = new Size(WindowWidth, CompactHeight);
+
+        Load += (_, _) => LayoutBody();
         Shown += async (_, _) => await RunAsync();
         FormClosing += (_, _) =>
         {
@@ -444,22 +435,49 @@ sealed class InstallerForm : Form
         return path;
     }
 
+    void LayoutBody()
+    {
+        const int pad = 28;
+        var innerW = Math.Max(160, _body.ClientSize.Width - pad * 2);
+        _step.Width = Math.Max(80, innerW - 72);
+        _status.SetBounds(pad, 38, innerW, 44);
+        _bar.SetBounds(pad, 92, innerW, 6);
+        var pctW = TextRenderer.MeasureText(_pct.Text, _pct.Font).Width;
+        _pct.Left = pad + innerW - pctW;
+        _pct.Top = _step.Top + 3;
+        if (!_detailsOpen) return;
+        var top = _bar.Bottom + 20;
+        _logWrap.SetBounds(pad, top, innerW, Math.Max(80, _body.ClientSize.Height - top - 4));
+    }
+
+    void ShowDetails(bool open)
+    {
+        _detailsOpen = open;
+        _logWrap.Visible = open;
+        _secondary.Text = open ? "Hide" : "Details";
+        ClientSize = new Size(WindowWidth, open ? DetailsHeight : CompactHeight);
+        LayoutBody();
+        _secondary.Invalidate();
+    }
+
     void SetProgress(int pct)
     {
         pct = Math.Clamp(pct, 0, 100);
         _bar.Value = pct / 100f;
         _bar.FillColor = pct >= 100 ? Success : Accent;
         _pct.Text = $"{pct}%";
-        // Keep % aligned to the progress bar's right edge
-        var w = TextRenderer.MeasureText(_pct.Text, _pct.Font).Width;
-        _pct.Left = _bar.Right - w;
+        _pct.ForeColor = pct >= 100 ? Success : Muted;
+        LayoutBody();
     }
 
-    void SetUi(string step, string status, Color? statusColor = null)
+    void SetUi(string step, string status, Color? stepColor = null)
     {
         _step.Text = step;
+        _step.ForeColor = stepColor is { } color && color.ToArgb() != Accent.ToArgb()
+            ? color
+            : Color.White;
         _status.Text = status;
-        _status.ForeColor = statusColor ?? Muted;
+        _status.ForeColor = Muted;
     }
 
     void AppendLog(string line)
@@ -625,6 +643,7 @@ sealed class InstallerForm : Form
     {
         if (_running) return;
         _running = true;
+        _primary.Text = "Please wait";
         _primary.Enabled = false;
         _primary.Invalidate();
         _log.Clear();
@@ -702,7 +721,7 @@ sealed class InstallerForm : Form
             if (code == 0)
             {
                 SetProgress(100);
-                SetUi("You're all set", "Vencord is updated and Discord has restarted.", Success);
+                SetUi("You're all set", "Discord is opening.", Success);
                 AppendLog("Finished successfully.");
                 CreateDesktopShortcut();
                 await Task.Delay(1500);
@@ -710,18 +729,20 @@ sealed class InstallerForm : Form
             }
             else
             {
-                SetUi("Something went wrong", "Open the log for details, then retry.", Danger);
+                SetUi("Couldn't finish", "The notes below say what stopped it.", Danger);
+                ShowDetails(true);
                 AppendLog($"Exit code: {code}");
-                _primary.Text = "Retry";
+                _primary.Text = "Try again";
                 _primary.Enabled = true;
                 _primary.Invalidate();
             }
         }
         catch (Exception ex)
         {
-            SetUi("Something went wrong", ex.Message, Danger);
+            SetUi("Couldn't finish", ex.Message, Danger);
+            ShowDetails(true);
             AppendLog(ex.Message);
-            _primary.Text = "Retry";
+            _primary.Text = "Try again";
             _primary.Enabled = true;
             _primary.Invalidate();
         }
@@ -760,6 +781,11 @@ sealed class InstallerForm : Form
         {
             SetProgress(58);
             SetUi("Delexo Plugins", "Overlaying your plugins…", Accent);
+        }
+        else if (line.Contains("Installing pnpm", StringComparison.OrdinalIgnoreCase))
+        {
+            SetProgress(12);
+            SetUi("Preparing", "Installing pnpm…", Accent);
         }
         else if (line.Contains("pnpm install", StringComparison.OrdinalIgnoreCase))
         {

@@ -4,8 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Mp3Encoder } from "./lame.js";
-
 export const RECORD_FORMATS = ["wav", "mp3", "ogg", "flac", "m4a", "webm", "aiff"] as const;
 export type RecordFormat = typeof RECORD_FORMATS[number];
 
@@ -44,6 +42,112 @@ export function recorderMimeFor(format: "webm" | "m4a"): string | null {
         } catch { /* ignore */ }
     }
     return null;
+}
+
+/** Copy one capture block to 16-bit samples so recordings don't sit in memory as 32-bit floats. */
+export function floatToInt16(input: Float32Array): Int16Array {
+    const out = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out;
+}
+
+function countInt16(chunks: Int16Array[]) {
+    let n = 0;
+    for (const chunk of chunks) n += chunk.length;
+    return n;
+}
+
+function int16ChunksToFloat(chunks: Int16Array[]): Float32Array {
+    const samples = new Float32Array(countInt16(chunks));
+    let offset = 0;
+    for (const chunk of chunks) {
+        for (let i = 0; i < chunk.length; i++) {
+            const s = chunk[i];
+            samples[offset++] = s < 0 ? s / 0x8000 : s / 0x7fff;
+        }
+    }
+    return samples;
+}
+
+export function encodeWavInt16(chunks: Int16Array[], sampleRate: number): Uint8Array {
+    const count = countInt16(chunks);
+    const buffer = new ArrayBuffer(44 + count * 2);
+    const view = new DataView(buffer);
+    writeAscii(view, 0, "RIFF");
+    view.setUint32(4, 36 + count * 2, true);
+    writeAscii(view, 8, "WAVE");
+    writeAscii(view, 12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeAscii(view, 36, "data");
+    view.setUint32(40, count * 2, true);
+    let idx = 44;
+    for (const chunk of chunks) {
+        for (let i = 0; i < chunk.length; i++, idx += 2)
+            view.setInt16(idx, chunk[i], true);
+    }
+    return new Uint8Array(buffer);
+}
+
+function encodeAiffInt16(chunks: Int16Array[], sampleRate: number): Uint8Array {
+    const count = countInt16(chunks);
+    const commSize = 18;
+    const ssndSize = 8 + count * 2;
+    const formSize = 4 + 8 + commSize + 8 + ssndSize;
+    const buffer = new ArrayBuffer(12 + 8 + commSize + 8 + ssndSize);
+    const view = new DataView(buffer);
+    writeAscii(view, 0, "FORM");
+    view.setUint32(4, formSize, false);
+    writeAscii(view, 8, "AIFF");
+    writeAscii(view, 12, "COMM");
+    view.setUint32(16, commSize, false);
+    view.setUint16(20, 1, false);
+    view.setUint32(22, count, false);
+    view.setUint16(26, 16, false);
+    writeIeee80(view, 28, sampleRate);
+    writeAscii(view, 38, "SSND");
+    view.setUint32(42, ssndSize, false);
+    view.setUint32(46, 0, false);
+    view.setUint32(50, 0, false);
+    let idx = 54;
+    for (const chunk of chunks) {
+        for (let i = 0; i < chunk.length; i++, idx += 2)
+            view.setInt16(idx, chunk[i], false);
+    }
+    return new Uint8Array(buffer);
+}
+
+export async function encodeInt16Recording(
+    format: PcmFormat,
+    chunks: Int16Array[],
+    sampleRate: number
+): Promise<{ bytes: Uint8Array; ext: string; }> {
+    switch (format) {
+        case "wav":
+            return { bytes: encodeWavInt16(chunks, sampleRate), ext: "wav" };
+        case "aiff":
+            return { bytes: encodeAiffInt16(chunks, sampleRate), ext: "aiff" };
+        case "mp3":
+        case "ogg":
+        case "flac": {
+            const pcm = int16ChunksToFloat(chunks);
+            if (format === "mp3") return { bytes: await encodeMp3(pcm, sampleRate), ext: "mp3" };
+            if (format === "ogg") return { bytes: await encodeOggOpus(pcm, sampleRate), ext: "ogg" };
+            return { bytes: await encodeFlac(pcm, sampleRate), ext: "flac" };
+        }
+        default: {
+            const exhaustive: never = format;
+            throw new Error(`Unsupported format: ${String(exhaustive)}`);
+        }
+    }
 }
 
 export function concatPcm(chunks: Float32Array[]): Float32Array {
@@ -182,7 +286,7 @@ async function encodeMp3(pcm: Float32Array, sampleRate: number): Promise<Uint8Ar
     try {
         return await encodeWithWebCodecs("mp3", pcm, sampleRate, 192000);
     } catch {
-        return encodeMp3Lame(pcm, sampleRate);
+        return await encodeMp3Lame(pcm, sampleRate);
     }
 }
 
@@ -192,7 +296,8 @@ function lameRate(sampleRate: number) {
     return Math.abs(sampleRate - 48000) < Math.abs(sampleRate - 44100) ? 48000 : 44100;
 }
 
-function encodeMp3Lame(pcm: Float32Array, sampleRate: number): Uint8Array {
+async function encodeMp3Lame(pcm: Float32Array, sampleRate: number): Promise<Uint8Array> {
+    const { Mp3Encoder } = await import("./lame.js");
     const rate = lameRate(sampleRate);
     const samples = toInt16(resampleLinear(pcm, sampleRate, rate));
     const encoder = new Mp3Encoder(1, rate, 192);

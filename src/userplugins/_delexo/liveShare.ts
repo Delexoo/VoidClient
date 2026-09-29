@@ -14,7 +14,16 @@ const POLL_MS = 15000;
 const FETCH_MIN_MS = 30000;
 let bioWriteChain: Promise<void> = Promise.resolve();
 
+const FETCH_CACHE_MAX = 200;
 const lastFetchAt = new Map<string, number>();
+
+function rememberFetch(userId: string) {
+    if (lastFetchAt.size >= FETCH_CACHE_MAX && !lastFetchAt.has(userId)) {
+        const oldest = lastFetchAt.keys().next().value;
+        if (oldest) lastFetchAt.delete(oldest);
+    }
+    lastFetchAt.set(userId, Date.now());
+}
 const inFlight = new Map<string, Promise<ReturnType<typeof UserProfileStore.getUserProfile>>>();
 let visibleIds = new Set<string>();
 let refs = 0;
@@ -179,7 +188,7 @@ export async function refreshUserProfile(userId: string, force = false) {
                     guildMember: body.guild_member
                 });
             }
-            lastFetchAt.set(userId, Date.now());
+            rememberFetch(userId);
             bumpProfiles();
             scheduleHideGhostBios();
             return UserProfileStore.getUserProfile(userId);
@@ -253,7 +262,7 @@ function onDiscordProfileSuccess(event: { userProfile?: { user?: { id?: string; 
         ?? ""
     );
     if (!id) return;
-    lastFetchAt.set(id, Date.now());
+    rememberFetch(id);
     bumpProfiles();
     scheduleHideGhostBios();
 }
@@ -377,4 +386,5 @@ export function stopLiveShare() {
     }
     visibleIds = new Set();
     inFlight.clear();
+    lastFetchAt.clear();
 }

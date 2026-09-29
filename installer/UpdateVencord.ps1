@@ -52,10 +52,89 @@ function Get-GitHubToken {
     return $null
 }
 
-function Ensure-Command([string]$Name) {
+$script:PnpmExe = $null
+# Must match "packageManager" in the Vencord package.json that gets built.
+$PnpmVersion = "11.9.0"
+
+function Ensure-Command([string]$Name, [string]$Hint) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
-        throw "Missing required command: $Name. Install Git, Node.js, and pnpm first."
+        throw "Missing required command: $Name. $Hint"
     }
+}
+
+function Get-NpmCommand {
+    foreach ($name in @("npm.cmd", "npm.exe", "npm")) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd -and $cmd.Source) { return $cmd.Source }
+    }
+    return $null
+}
+
+function Add-PathFront([string]$Dir) {
+    if (-not $Dir) { return }
+    $parts = @($env:PATH -split ';' | Where-Object { $_ })
+    if ($parts -notcontains $Dir) {
+        $env:PATH = "$Dir;$env:PATH"
+    }
+}
+
+function Resolve-PnpmBinary([string]$Prefix) {
+    $candidates = @(
+        (Join-Path $Prefix "pnpm.cmd"),
+        (Join-Path $Prefix "pnpm.exe"),
+        (Join-Path $Prefix "pnpm"),
+        (Join-Path $Prefix "node_modules\.bin\pnpm.cmd"),
+        (Join-Path $Prefix "node_modules\.bin\pnpm.exe"),
+        (Join-Path $Prefix "node_modules\.bin\pnpm")
+    )
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath $candidate) { return $candidate }
+    }
+    return $null
+}
+
+function Ensure-Pnpm {
+    foreach ($name in @("pnpm.cmd", "pnpm.exe", "pnpm")) {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd -and $cmd.Source) {
+            $script:PnpmExe = $cmd.Source
+            Add-PathFront (Split-Path -Parent $cmd.Source)
+            Write-Log "Using pnpm at $($cmd.Source)"
+            return
+        }
+    }
+
+    $prefix = Join-Path $InstallRoot "pnpm"
+    $existing = Resolve-PnpmBinary $prefix
+    if ($existing) {
+        $script:PnpmExe = $existing
+        Add-PathFront (Split-Path -Parent $existing)
+        Write-Log "Using local pnpm at $existing"
+        return
+    }
+
+    $npm = Get-NpmCommand
+    if (-not $npm) {
+        throw "Missing required command: npm. Install Node.js 22 or newer from https://nodejs.org and retry."
+    }
+
+    Write-Log "Installing pnpm $PnpmVersion (not on PATH; no admin required)"
+    New-Item -ItemType Directory -Force -Path $prefix | Out-Null
+    $code = Invoke-Native $npm @(
+        "install", "-g", "--prefix", $prefix, "pnpm@$PnpmVersion", "--no-fund", "--no-audit"
+    ) -AllowFail
+    $installed = Resolve-PnpmBinary $prefix
+    if ($code -ne 0 -or -not $installed) {
+        throw "Could not install pnpm. Confirm Node.js and npm work, then retry."
+    }
+    $script:PnpmExe = $installed
+    Add-PathFront (Split-Path -Parent $installed)
+    Write-Log "Installed pnpm at $installed"
+}
+
+function Invoke-Pnpm([string[]]$PnpmArgs) {
+    if (-not $script:PnpmExe) { throw "pnpm is not available" }
+    return Invoke-Native $script:PnpmExe $PnpmArgs -AllowFail
 }
 
 function Invoke-Native([string]$FileName, [string[]]$CmdArgs, [switch]$AllowFail) {
@@ -193,11 +272,9 @@ try {
     Write-Log "InstallRoot=$InstallRoot"
     Write-Log "Vencord=$VencordDir"
 
-    Ensure-Command git
-    Ensure-Command node
-    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue) -and -not (Get-Command pnpm.cmd -ErrorAction SilentlyContinue)) {
-        throw "Missing required command: pnpm. Install with: npm install -g pnpm"
-    }
+    Ensure-Command git "Install Git from https://git-scm.com and retry."
+    Ensure-Command node "Install Node.js 22 or newer from https://nodejs.org and retry."
+    Ensure-Pnpm
 
     $token = Get-GitHubToken
     if ($token) {
@@ -355,9 +432,9 @@ try {
     Push-Location $VencordDir
     try {
         Write-Log "pnpm install"
-        $pnpmCode = Invoke-Native "cmd.exe" @("/c", "pnpm", "install", "--frozen-lockfile") -AllowFail
+        $pnpmCode = Invoke-Pnpm @("install", "--frozen-lockfile")
         if ($pnpmCode -ne 0) {
-            $pnpmCode = Invoke-Native "cmd.exe" @("/c", "pnpm", "install") -AllowFail
+            $pnpmCode = Invoke-Pnpm @("install")
             if ($pnpmCode -ne 0) { throw "pnpm install failed" }
         }
 

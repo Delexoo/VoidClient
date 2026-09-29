@@ -5,7 +5,7 @@
  */
 
 import { app, BrowserWindow, desktopCapturer, dialog, IpcMainInvokeEvent } from "electron";
-import { existsSync, mkdirSync, writeFileSync } from "fs";
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join, resolve, sep } from "path";
 
@@ -83,7 +83,8 @@ export async function writeRecording(
     _: IpcMainInvokeEvent,
     dir: string,
     fileName: string,
-    base64Data: string
+    base64Data: string,
+    append = false
 ) {
     try {
         if (!dir || !fileName) return { ok: false, data: "missing path" };
@@ -94,7 +95,9 @@ export async function writeRecording(
         const rootPrefix = root.endsWith(sep) ? root.toLowerCase() : (root + sep).toLowerCase();
         if (!full.toLowerCase().startsWith(rootPrefix) && full.toLowerCase() !== root.toLowerCase())
             return { ok: false, data: "bad path" };
-        writeFileSync(full, Buffer.from(base64Data, "base64"));
+        const buf = Buffer.from(base64Data, "base64");
+        if (append) appendFileSync(full, buf);
+        else writeFileSync(full, buf);
         return { ok: true, data: full };
     } catch (e) {
         return { ok: false, data: String(e) };

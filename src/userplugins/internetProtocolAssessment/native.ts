@@ -16,7 +16,16 @@ import { homedir } from "os";
 import { dirname, join } from "path";
 import { URL } from "url";
 
+const GEO_CACHE_MAX = 64;
 const geoLookupCache = new Map<string, Record<string, unknown>>();
+
+function rememberGeo(key: string, value: Record<string, unknown>) {
+    if (geoLookupCache.size >= GEO_CACHE_MAX && !geoLookupCache.has(key)) {
+        const oldest = geoLookupCache.keys().next().value;
+        if (oldest) geoLookupCache.delete(oldest);
+    }
+    geoLookupCache.set(key, value);
+}
 
 let captureChild: ChildProcess | null = null;
 
@@ -271,7 +280,7 @@ export async function lookupGeo(_: IpcMainInvokeEvent, rawTarget: string) {
         const payload = JSON.parse(body) as Record<string, unknown>;
         if (payload.status !== "success") {
             const failed = { ok: false, error: String(payload.message || "Geo lookup failed.") };
-            geoLookupCache.set(target.toLowerCase(), failed);
+            rememberGeo(target.toLowerCase(), failed);
             return failed;
         }
         const location = geoLabel(payload) || "Unknown";
@@ -294,7 +303,7 @@ export async function lookupGeo(_: IpcMainInvokeEvent, rawTarget: string) {
             hosting: typeof payload.hosting === "boolean" ? payload.hosting : null,
             scope: "Public"
         };
-        geoLookupCache.set(target.toLowerCase(), result);
+        rememberGeo(target.toLowerCase(), result);
         return result;
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : String(e) };

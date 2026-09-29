@@ -45,6 +45,7 @@ const KEEP_OPTIONS = [
     { label: "1 Day", value: "day" }
 ] as const;
 
+const LIVE_CAP = 400;
 const live = new Map<string, SavedMessage>();
 let purgeTimer: ReturnType<typeof setInterval> | null = null;
 let emitTimer = 0;
@@ -241,8 +242,51 @@ function attachmentLines(msg: any): string[] {
     });
 }
 
+function plainList(value: unknown, limit: number) {
+    return Array.isArray(value) ? value.slice(0, limit) : [];
+}
+
+function slimMentions(value: unknown) {
+    return plainList(value, 20).map((m: any) => ({
+        id: m?.id != null ? String(m.id) : undefined,
+        username: m?.username,
+        global_name: m?.global_name,
+        avatar: m?.avatar,
+        discriminator: m?.discriminator,
+        bot: Boolean(m?.bot)
+    }));
+}
+
+function slimAttachments(value: unknown) {
+    return plainList(value, 10).map((a: any) => ({
+        id: a?.id != null ? String(a.id) : undefined,
+        filename: a?.filename,
+        url: a?.url,
+        proxy_url: a?.proxy_url,
+        content_type: a?.content_type,
+        size: a?.size,
+        width: a?.width,
+        height: a?.height
+    }));
+}
+
+function slimEmbeds(value: unknown) {
+    return plainList(value, 4).map((e: any) => ({
+        type: e?.type,
+        url: e?.url,
+        title: typeof e?.title === "string" ? e.title.slice(0, 300) : undefined,
+        description: typeof e?.description === "string" ? e.description.slice(0, 1000) : undefined,
+        color: e?.color,
+        thumbnail: e?.thumbnail?.url ? { url: e.thumbnail.url } : undefined,
+        image: e?.image?.url ? { url: e.image.url } : undefined,
+        video: e?.video?.url ? { url: e.video.url } : undefined,
+        author: e?.author?.name ? { name: e.author.name, icon_url: e.author.icon_url } : undefined
+    }));
+}
+
 function rawMessage(msg: any, deleted: boolean): Record<string, unknown> {
     const author = authorBlob(msg);
+    const reply = msg.referenced_message;
     return {
         id: String(msg.id),
         channel_id: String(msg.channel_id),
@@ -254,17 +298,24 @@ function rawMessage(msg: any, deleted: boolean): Record<string, unknown> {
         edited_timestamp: msg.edited_timestamp ? iso(msg.edited_timestamp) : null,
         tts: Boolean(msg.tts),
         mention_everyone: Boolean(msg.mention_everyone),
-        mentions: msg.mentions ?? [],
-        mention_roles: msg.mention_roles ?? [],
-        attachments: msg.attachments ?? [],
-        embeds: msg.embeds ?? [],
+        mentions: slimMentions(msg.mentions),
+        mention_roles: plainList(msg.mention_roles, 20),
+        attachments: slimAttachments(msg.attachments),
+        embeds: slimEmbeds(msg.embeds),
         pinned: Boolean(msg.pinned),
         author,
-        message_reference: msg.message_reference ?? null,
-        referenced_message: msg.referenced_message ?? null,
+        message_reference: msg.message_reference
+            ? { channel_id: msg.message_reference.channel_id, message_id: msg.message_reference.message_id }
+            : null,
+        referenced_message: reply?.id
+            ? {
+                id: String(reply.id),
+                content: String(reply.content ?? "").slice(0, 200),
+                author: authorBlob(reply)
+            }
+            : null,
         nonce: msg.nonce,
-        deleted,
-        editHistory: msg.editHistory ?? []
+        deleted
     };
 }
 
@@ -295,7 +346,7 @@ function rememberLive(msg: any) {
     const snap = snapshot(msg, "deleted");
     if (!snap) return;
     live.set(snap.messageId, snap);
-    if (live.size <= 2500) return;
+    if (live.size <= LIVE_CAP) return;
     const first = live.keys().next().value;
     if (first) live.delete(first);
 }

@@ -15,9 +15,9 @@ import { createRoot, SelectedChannelStore, Toasts, useEffect, useLayoutEffect, u
 import type { Root } from "react-dom/client";
 
 import {
-    concatPcm,
-    encodePcmRecording,
-    encodeWav,
+    encodeInt16Recording,
+    encodeWavInt16,
+    floatToInt16,
     FORMAT_OPTIONS,
     isPcmFormat,
     isRecordFormat,
@@ -92,7 +92,7 @@ let recorderMime = "audio/webm";
 let activeStreams: MediaStream[] = [];
 let audioCtx: AudioContext | null = null;
 let recordedChunks: BlobPart[] = [];
-let pcmChunks: Float32Array[] = [];
+let pcmChunks: Int16Array[] = [];
 let pcmSampleRate = 48000;
 let activeFormat: RecordFormat = "wav";
 let processorNode: ScriptProcessorNode | null = null;
@@ -221,23 +221,25 @@ async function getSystemAudioStream() {
         : new Error("System/Discord audio not available on this device");
 }
 
-async function blobToBase64(blob: Blob) {
-    const buf = await blob.arrayBuffer();
-    const bytes = new Uint8Array(buf);
-    let binary = "";
-    const chunk = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunk) {
-        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-    }
-    return btoa(binary);
-}
-
 function uint8ToBase64(bytes: Uint8Array) {
     let binary = "";
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk)
         binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
     return btoa(binary);
+}
+
+/** Write the file in pieces so the base64 copy never covers the whole recording. */
+async function writeBytes(dir: string, fileName: string, bytes: Uint8Array) {
+    if (!Native) return { ok: false as const, data: "native missing" };
+    const piece = 256 * 1024;
+    let res = { ok: false as const, data: "empty recording" };
+    for (let i = 0; i < bytes.length; i += piece) {
+        const slice = bytes.subarray(i, Math.min(i + piece, bytes.length));
+        res = await Native.writeRecording(dir, fileName, uint8ToBase64(slice), i > 0);
+        if (!res.ok) return res;
+    }
+    return res;
 }
 
 async function startCapture() {
@@ -305,7 +307,7 @@ async function startCapture() {
             silence.gain.value = 0;
             processorNode.onaudioprocess = ev => {
                 if (!wantedCapture) return;
-                pcmChunks.push(new Float32Array(ev.inputBuffer.getChannelData(0)));
+                pcmChunks.push(floatToInt16(ev.inputBuffer.getChannelData(0)));
             };
             mixer.connect(processorNode);
             processorNode.connect(silence);
@@ -364,12 +366,12 @@ async function stopCapture() {
             let ext = format;
             let bytes: Uint8Array;
             try {
-                const encoded = await encodePcmRecording(format, pcmChunks, pcmSampleRate);
+                const encoded = await encodeInt16Recording(format, pcmChunks, pcmSampleRate);
                 bytes = encoded.bytes;
                 ext = encoded.ext;
             } catch (e) {
                 log.error("encode failed, saving WAV", e);
-                bytes = encodeWav(concatPcm(pcmChunks), pcmSampleRate);
+                bytes = encodeWavInt16(pcmChunks, pcmSampleRate);
                 ext = "wav";
                 Toasts.show({
                     message: `Couldn't encode ${format.toUpperCase()} — saved WAV instead.`,
@@ -379,8 +381,8 @@ async function stopCapture() {
             }
             pcmChunks = [];
             if (bytes.length && Native) {
-                const b64 = uint8ToBase64(bytes);
-                const res = await Native.writeRecording(dir, `discord-capture-${stamp}.${ext}`, b64);
+                const res = await writeBytes(dir, `discord-capture-${stamp}.${ext}`, bytes);
+                bytes = new Uint8Array(0);
                 if (res.ok) {
                     lastFile = res.data;
                     settings.store.lastFilePath = res.data;
@@ -397,8 +399,8 @@ async function stopCapture() {
             const blob = new Blob(recordedChunks, { type: recorderMime });
             recordedChunks = [];
             if (blob.size > 0 && Native) {
-                const b64 = await blobToBase64(blob);
-                const res = await Native.writeRecording(dir, `discord-capture-${stamp}.${ext}`, b64);
+                const recorded = new Uint8Array(await blob.arrayBuffer());
+                const res = await writeBytes(dir, `discord-capture-${stamp}.${ext}`, recorded);
                 if (res.ok) {
                     lastFile = res.data;
                     settings.store.lastFilePath = res.data;
