@@ -116,6 +116,12 @@ export function Updatable(props: CommonProps) {
                                         />
                                     ));
                                 });
+                            } else {
+                                Toasts.show({
+                                    message: "No newer Void Client build is on GitHub yet.",
+                                    id: Toasts.genId(),
+                                    type: Toasts.Type.MESSAGE
+                                });
                             }
                         })}
                     >
