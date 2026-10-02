@@ -123,15 +123,17 @@ async function runUpdateCheck() {
         if (!isOutdated) return;
 
         if (Settings.autoUpdate) {
-            await update();
-            if (Settings.autoUpdateNotification) {
-                notify({
-                    title: "Void Client has been updated!",
-                    body: "Click here to restart",
-                    onClick: relaunch
-                });
+            const updated = await update();
+            if (updated) {
+                if (Settings.autoUpdateNotification) {
+                    notify({
+                        title: "Void Client has been updated!",
+                        body: "Click here to restart",
+                        onClick: relaunch
+                    });
+                }
+                return;
             }
-            return;
         }
 
         notify({
@@ -152,11 +154,7 @@ async function init() {
 
     if (!IS_WEB && !IS_UPDATER_DISABLED) {
         runUpdateCheck();
-
-        // this tends to get really annoying, so only do this if the user has auto-update without notification enabled
-        if (Settings.autoUpdate && !Settings.autoUpdateNotification) {
-            setInterval(runUpdateCheck, 1000 * 60 * 30); // 30 minutes
-        }
+        setInterval(runUpdateCheck, 1000 * 60 * 10);
     }
 
     if (IS_DEV) {

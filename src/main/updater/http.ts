@@ -42,27 +42,76 @@ async function githubGet<T = any>(endpoint: string) {
     });
 }
 
-async function calculateGitChanges() {
-    const isOutdated = await fetchUpdates();
-    if (!isOutdated) return [];
+function mapCommit(commit: any) {
+    return {
+        hash: String(commit.sha || commit.hash || "").slice(0, 7),
+        author: commit.author?.login ?? commit.commit?.author?.name ?? "Unknown Author",
+        message: String(commit.commit?.message || commit.message || "").split("\n")[0],
+        date: String(commit.commit?.author?.date || "").slice(0, 10)
+    };
+}
 
+function hashesMatch(installed: string, remote: string) {
+    const left = String(installed || "").toLowerCase();
+    const right = String(remote || "").toLowerCase();
+    if (!left || !right || left === "local" || right === "local") return false;
+    return left === right || left.startsWith(right) || right.startsWith(left);
+}
+
+async function commitsSinceInstall() {
     try {
         const data = await githubGet(`/compare/${gitHash}...HEAD`);
-        const commits = data.commits.map((c: any) => ({
-            hash: c.sha.slice(0, 7),
-            author: c.author?.login ?? c.commit?.author?.name ?? "Unknown Author",
-            message: c.commit.message.split("\n")[0]
-        }));
+        const commits = (data.commits || []).map(mapCommit).filter(commit => commit.hash);
         if (commits.length) return commits;
     } catch {
-        // The installed build may not be on the remote yet.
+        // The installed hash may not be on this repo yet.
     }
 
+    const found = [] as ReturnType<typeof mapCommit>[];
+    for (let page = 1; page <= 10; page++) {
+        const batch = await githubGet(`/commits?per_page=100&page=${page}`);
+        if (!Array.isArray(batch) || !batch.length) break;
+        let reachedInstall = false;
+        for (const commit of batch) {
+            if (hashesMatch(gitHash, commit.sha)) {
+                reachedInstall = true;
+                break;
+            }
+            found.push(mapCommit(commit));
+        }
+        if (reachedInstall || batch.length < 100) break;
+    }
+    return found;
+}
+
+async function calculateGitChanges() {
+    let headSha = "";
+    try {
+        headSha = String((await githubGet("/commits/HEAD"))?.sha || "");
+    } catch {
+        headSha = "";
+    }
+
+    const behindRepo = !!headSha && !hashesMatch(gitHash, headSha);
+    const releaseOutdated = await fetchUpdates();
+    if (!behindRepo && !releaseOutdated) return [];
+
+    const commits = await commitsSinceInstall();
+    if (commits.length) return commits;
+
     return [{
-        hash: "update",
+        hash: headSha.slice(0, 7) || "update",
         author: "Void Client",
-        message: "A newer build is on GitHub"
+        message: "A newer build is on GitHub",
+        date: ""
     }];
+}
+
+async function listCommits(_event: unknown, page = 1) {
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const batch = await githubGet(`/commits?per_page=100&page=${safePage}`);
+    const commits = (Array.isArray(batch) ? batch : []).map(mapCommit).filter(commit => commit.hash);
+    return { commits, hasMore: commits.length === 100 };
 }
 
 async function latestRelease() {
@@ -83,8 +132,16 @@ async function fetchUpdates() {
 
     const name = String(data?.name || "");
     const hash = name.slice(name.lastIndexOf(" ") + 1);
-    if (hash && hash === gitHash)
+    if (!hash || hashesMatch(gitHash, hash))
         return false;
+
+    try {
+        const compared = await githubGet(`/compare/${gitHash}...${hash}`);
+        if (compared?.status === "behind" || compared?.status === "identical")
+            return false;
+    } catch {
+        // A release hash that is not on the repo can still be downloaded.
+    }
 
     PendingUpdates = [];
     for (const asset of data?.assets || []) {
@@ -109,6 +166,7 @@ async function applyUpdates() {
     return true;
 }
 
+ipcMain.handle(IpcEvents.GET_COMMIT_LOG, serializeErrors(listCommits));
 ipcMain.handle(IpcEvents.GET_REPO, serializeErrors(() => `https://github.com/${gitRemote}`));
 ipcMain.handle(IpcEvents.GET_UPDATES, serializeErrors(calculateGitChanges));
 ipcMain.handle(IpcEvents.UPDATE, serializeErrors(fetchUpdates));

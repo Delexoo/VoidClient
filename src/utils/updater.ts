@@ -26,7 +26,15 @@ export const UpdateLogger = /* #__PURE__*/ new Logger("Updater", "white");
 export let isOutdated = false;
 export let isNewer = false;
 export let updateError: any;
-export let changes: Record<"hash" | "author" | "message", string>[];
+export type CommitLogEntry = Record<"hash" | "author" | "message" | "date", string>;
+export let changes: CommitLogEntry[];
+
+const commitLogListeners = new Set<() => void>();
+
+export function onCommitLogRefresh(cb: () => void) {
+    commitLogListeners.add(cb);
+    return () => commitLogListeners.delete(cb);
+}
 
 async function Unwrap<T>(p: Promise<IpcRes<T>>) {
     const res = await p;
@@ -48,7 +56,12 @@ export async function checkForUpdates() {
         }
     }
 
+    commitLogListeners.forEach(cb => cb());
     return (isOutdated = changes.length > 0);
+}
+
+export async function getCommitLog(page = 1) {
+    return Unwrap(VencordNative.updater.getCommitLog(page));
 }
 
 export async function update() {

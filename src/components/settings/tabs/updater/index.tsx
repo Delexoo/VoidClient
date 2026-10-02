@@ -29,8 +29,8 @@ import { SettingsTab, wrapTab } from "@components/settings/tabs/BaseTab";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { useAwaiter } from "@utils/react";
-import { getRepo, isNewer, UpdateLogger } from "@utils/updater";
-import { Forms, React } from "@webpack/common";
+import { CommitLogEntry, getCommitLog, getRepo, isNewer, onCommitLogRefresh, UpdateLogger } from "@utils/updater";
+import { Forms, React, useEffect, useState } from "@webpack/common";
 
 import gitHash from "~git-hash";
 
@@ -61,6 +61,68 @@ function VesktopSection() {
                 </Card>
             )}
         </Flex>
+    );
+}
+
+function sameBuild(hash: string) {
+    const installed = gitHash.toLowerCase();
+    const remote = hash.toLowerCase();
+    return installed === remote || installed.startsWith(remote) || remote.startsWith(installed);
+}
+
+function CommitLog({ repo, repoPending }: CommonProps) {
+    const [commits, setCommits] = useState<CommitLogEntry[]>([]);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    async function load(nextPage: number, replace: boolean) {
+        setLoading(true);
+        try {
+            const result = await getCommitLog(nextPage);
+            setCommits(prev => replace ? result.commits : [...prev, ...result.commits]);
+            setPage(nextPage);
+            setHasMore(result.hasMore);
+            setError("");
+        } catch (e) {
+            setError(e instanceof Error ? e.message : String(e));
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        void load(1, true);
+        return onCommitLogRefresh(() => void load(1, true));
+    }, []);
+
+    return (
+        <>
+            <Forms.FormTitle tag="h5" className={Margins.top16}>Update log</Forms.FormTitle>
+            {error ? <Forms.FormText>Couldn't load the GitHub history. {error}</Forms.FormText> : null}
+            <div style={{ maxHeight: 360, overflow: "auto" }}>
+                {commits.map(commit => (
+                    <div key={`${commit.hash}-${commit.date}-${commit.message}`} style={{ margin: "0.45em 0" }}>
+                        <code><HashLink hash={commit.hash} repo={repo} disabled={repoPending} /></code>
+                        <span style={{ marginLeft: "0.5em", color: "var(--text-default)" }}>
+                            {commit.date ? `${commit.date} ` : ""}{commit.message} — {commit.author}
+                            {sameBuild(commit.hash) ? " (this build)" : ""}
+                        </span>
+                    </div>
+                ))}
+            </div>
+            {hasMore ? (
+                <Button
+                    variant="secondary"
+                    className={Margins.top8}
+                    disabled={loading}
+                    onClick={() => void load(page + 1, false)}
+                >
+                    {loading ? "Loading..." : "Load older commits"}
+                </Button>
+            ) : null}
+        </>
     );
 }
 
@@ -115,6 +177,8 @@ function Updater() {
                 {" "}
                 (<HashLink hash={gitHash} repo={repo} disabled={repoPending} />)
             </Forms.FormText>
+
+            <CommitLog {...commonProps} />
 
             <Divider className={classes(Margins.top16, Margins.bottom16)} />
 

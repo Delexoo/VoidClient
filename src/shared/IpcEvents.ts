@@ -39,6 +39,7 @@ export const enum IpcEvents {
     RESET_USER_DATA = "VencordResetUserData",
 
     GET_UPDATES = "VencordGetUpdates",
+    GET_COMMIT_LOG = "VencordGetCommitLog",
     GET_REPO = "VencordGetRepo",
     UPDATE = "VencordUpdate",
     BUILD = "VencordBuild",

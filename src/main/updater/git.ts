@@ -84,6 +84,19 @@ async function build() {
     return !res.stderr.includes("Build failed");
 }
 
+async function listCommits(_event: unknown, page = 1) {
+    const safePage = Math.max(1, Math.floor(Number(page) || 1));
+    const skip = (safePage - 1) * 100;
+    const res = await git("log", `--skip=${skip}`, "-n", "100", "--pretty=format:%h%x09%an%x09%ad%x09%s", "--date=short");
+    const lines = res.stdout.trim() ? res.stdout.trim().split("\n") : [];
+    const commits = lines.map(line => {
+        const [hash, author, date, ...rest] = line.split("\t");
+        return { hash, author, date, message: rest.join("\t") };
+    }).filter(commit => commit.hash);
+    return { commits, hasMore: commits.length === 100 };
+}
+
+ipcMain.handle(IpcEvents.GET_COMMIT_LOG, serializeErrors(listCommits));
 ipcMain.handle(IpcEvents.GET_REPO, serializeErrors(getRepo));
 ipcMain.handle(IpcEvents.GET_UPDATES, serializeErrors(calculateGitChanges));
 ipcMain.handle(IpcEvents.UPDATE, serializeErrors(pull));

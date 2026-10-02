@@ -46,7 +46,8 @@ export default {
     },
 
     updater: {
-        getUpdates: () => invoke<IpcRes<Record<"hash" | "author" | "message", string>[]>>(IpcEvents.GET_UPDATES),
+        getUpdates: () => invoke<IpcRes<Record<"hash" | "author" | "message" | "date", string>[]>>(IpcEvents.GET_UPDATES),
+        getCommitLog: (page?: number) => invoke<IpcRes<{ commits: Record<"hash" | "author" | "message" | "date", string>[]; hasMore: boolean; }>>(IpcEvents.GET_COMMIT_LOG, page ?? 1),
         update: () => invoke<IpcRes<boolean>>(IpcEvents.UPDATE),
         rebuild: () => invoke<IpcRes<boolean>>(IpcEvents.BUILD),
         getRepo: () => invoke<IpcRes<string>>(IpcEvents.GET_REPO),
