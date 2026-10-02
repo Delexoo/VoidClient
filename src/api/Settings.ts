@@ -19,6 +19,7 @@
 import { SettingsStore as SettingsStoreClass } from "@shared/SettingsStore";
 import { Logger } from "@utils/Logger";
 import { mergeDefaults } from "@utils/mergeDefaults";
+import { markUserDataReset } from "@utils/userDataReset";
 import { DefinedSettings, OptionType, SettingsChecks, SettingsDefinition } from "@utils/types";
 import { React, useEffect } from "@webpack/common";
 
@@ -203,10 +204,43 @@ export const SettingsStore = new SettingsStoreClass(settings, {
     }
 });
 
+let persistSettings = !IS_REPORTER;
+
+export function stopPersistingSettings() {
+    persistSettings = false;
+}
+
+export function clearInMemorySettings() {
+    stopPersistingSettings();
+    const plugins = SettingsStore.plain.plugins as Record<string, Record<string, unknown>> | undefined;
+    if (plugins?.DelexoPlugins) plugins.DelexoPlugins.openRouterKey = "";
+    if (plugins) {
+        for (const plugin of Object.values(plugins)) {
+            if (!plugin) continue;
+            for (const field of Object.keys(plugin)) {
+                if (/apiKey|openrouter|token|secret/i.test(field)) plugin[field] = "";
+            }
+        }
+    }
+    const shared = SettingsStore.plain.plugins?.DelexoPlugins;
+    if (shared) shared.openRouterKey = "";
+    for (const key of Object.keys(SettingsStore.plain))
+        delete (SettingsStore.plain as Record<string, unknown>)[key];
+    markUserDataReset();
+}
+
 if (!IS_REPORTER) {
     SettingsStore.addGlobalChangeListener((_, path) => {
-        SettingsStore.plain.cloud.settingsSyncVersion = Date.now();
-        VencordNative.settings.set(SettingsStore.plain, path);
+        if (!persistSettings) return;
+        const plain = SettingsStore.plain;
+        plain.cloud ??= {
+            authenticated: false,
+            url: "https://api.vencord.dev/",
+            settingsSync: false,
+            settingsSyncVersion: 0
+        };
+        plain.cloud.settingsSyncVersion = Date.now();
+        VencordNative.settings.set(plain, path);
     });
 }
 

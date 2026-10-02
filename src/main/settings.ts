@@ -28,7 +28,15 @@ function readSettings<T = object>(name: string, file: string): Partial<T> {
 
 export const RendererSettings = new SettingsStore(readSettings<Settings>("renderer", SETTINGS_FILE));
 
+let settingsLocked = false;
+
+export function beginSettingsReset() {
+    settingsLocked = true;
+    RendererSettings.setData({} as Settings);
+}
+
 RendererSettings.addGlobalChangeListener(() => {
+    if (settingsLocked) return;
     try {
         writeFileSync(SETTINGS_FILE, JSON.stringify(RendererSettings.plain, null, 4));
     } catch (e) {
@@ -36,9 +44,10 @@ RendererSettings.addGlobalChangeListener(() => {
     }
 });
 
-ipcMain.on(IpcEvents.GET_SETTINGS, e => e.returnValue = RendererSettings.plain);
+ipcMain.on(IpcEvents.GET_SETTINGS, e => e.returnValue = settingsLocked ? {} : RendererSettings.plain);
 
 ipcMain.handle(IpcEvents.SET_SETTINGS, (_, data: Settings, pathToNotify?: string) => {
+    if (settingsLocked) return;
     RendererSettings.setData(data, pathToNotify);
 });
 

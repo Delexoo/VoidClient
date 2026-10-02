@@ -1,0 +1,36 @@
+.vc-updater-log {
+    max-height: 360px;
+    overflow: auto;
+    padding-right: 8px;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(0 0% 100% / 0.28) transparent;
+}
+
+.vc-updater-log::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.vc-updater-log::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+.vc-updater-log::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.vc-updater-log::-webkit-scrollbar-track {
+    background: hsl(0 0% 100% / 0.05);
+    border-radius: 999px;
+    margin: 6px 2px;
+}
+
+.vc-updater-log::-webkit-scrollbar-thumb {
+    background-color: hsl(0 0% 100% / 0.24);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    min-height: 40px;
+}

@@ -59,11 +59,12 @@ function Get-DiscordRoots {
 }
 
 function Stop-OurDiscord([string]$root) {
-    foreach ($name in @("Discord.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe")) {
+    $prefix = $root.TrimEnd("\") + "\"
+    foreach ($name in @("Discord.exe", "DiscordCanary.exe", "DiscordPTB.exe", "DiscordDevelopment.exe", "Update.exe")) {
         $rows = @(Get-CimInstance Win32_Process -Filter "Name = '$name'" -ErrorAction SilentlyContinue)
         foreach ($row in $rows) {
             $path = [string]$row.ExecutablePath
-            if ($path -and $path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
+            if ($path -and ($path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or ($path.TrimEnd("\") -eq $root.TrimEnd("\")))) {
                 Stop-Process -Id ([int]$row.ProcessId) -Force -ErrorAction SilentlyContinue
             }
         }
@@ -77,10 +78,27 @@ function Restore-Channel([string]$root) {
         $current = Join-Path $resources "app.asar"
         $backup = Join-Path $resources "_app.asar"
         if (-not (Test-Path -LiteralPath $backup)) { continue }
-        Stop-OurDiscord $root
-        Start-Sleep -Milliseconds 600
-        if (Test-Path -LiteralPath $current) { Remove-Item -LiteralPath $current -Force -ErrorAction SilentlyContinue }
-        Rename-Item -LiteralPath $backup -NewName "app.asar"
+        $backupFile = Get-Item -LiteralPath $backup
+        if ($backupFile.Length -lt 100000) { throw "The saved Discord app in $($app.FullName) is too small to restore." }
+        $restored = $false
+        for ($try = 0; $try -lt 30; $try++) {
+            Stop-OurDiscord $root
+            Start-Sleep -Milliseconds 400
+            try {
+                if (Test-Path -LiteralPath $current) {
+                    $live = Get-Item -LiteralPath $current
+                    $live.Attributes = "Normal"
+                }
+                [System.IO.File]::Copy($backup, $current, $true)
+                $size = (Get-Item -LiteralPath $current).Length
+                if ($size -eq $backupFile.Length) {
+                    [System.IO.File]::Delete($backup)
+                    $restored = $true
+                    break
+                }
+            } catch {}
+        }
+        if (-not $restored) { throw "Original Discord could not be restored in $($app.FullName)." }
     }
 }
 
@@ -98,7 +116,8 @@ $timer.Add_Tick({
         foreach ($path in @(
             (Join-Path $env:APPDATA "Vencord"),
             (Join-Path $env:USERPROFILE "Documents\StalkerMode"),
-            (Join-Path ([Environment]::GetFolderPath("Desktop")) "Void Client.lnk")
+            (Join-Path ([Environment]::GetFolderPath("Desktop")) "Void Client.lnk"),
+            (Join-Path ([Environment]::GetFolderPath("Desktop")) "Void Client Installer.lnk")
         )) {
             if (Test-Path -LiteralPath $path) { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue }
         }

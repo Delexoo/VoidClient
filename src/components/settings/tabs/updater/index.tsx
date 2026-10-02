@@ -35,6 +35,7 @@ import { Forms, React, useEffect, useState } from "@webpack/common";
 import gitHash from "~git-hash";
 
 import { CommonProps, HashLink, Newer, Updatable } from "./Components";
+import "./updaterLog.css";
 
 function VesktopSection() {
     if (!IS_VESKTOP) return null;
@@ -101,7 +102,7 @@ function CommitLog({ repo, repoPending }: CommonProps) {
         <>
             <Forms.FormTitle tag="h5" className={Margins.top16}>Update log</Forms.FormTitle>
             {error ? <Forms.FormText>Couldn't load the GitHub history. {error}</Forms.FormText> : null}
-            <div style={{ maxHeight: 360, overflow: "auto" }}>
+            <div className="vc-updater-log">
                 {commits.map(commit => (
                     <div key={`${commit.hash}-${commit.date}-${commit.message}`} style={{ margin: "0.45em 0" }}>
                         <code><HashLink hash={commit.hash} repo={repo} disabled={repoPending} /></code>

@@ -206,6 +206,10 @@
     outline: none;
 }
 
+.vc-ork-input[data-hidden="true"] {
+    -webkit-text-security: disc;
+}
+
 .vc-ork-input::placeholder {
     color: var(--text-muted);
 }

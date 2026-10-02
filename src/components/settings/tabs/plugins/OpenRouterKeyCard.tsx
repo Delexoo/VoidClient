@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { useSettings } from "@api/Settings";
 import { Card } from "@components/Card";
 import { copyToClipboard } from "@utils/clipboard";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { getOpenRouterKey, setOpenRouterKey } from "@utils/openRouterKey";
-import { showToast, Toasts, useState } from "@webpack/common";
+import { onUserDataReset } from "@utils/userDataReset";
+import { showToast, Toasts, useEffect, useState } from "@webpack/common";
 
 function EyeIcon({ hidden }: { hidden: boolean; }) {
     if (hidden) {
@@ -39,8 +41,16 @@ function CopyIcon() {
 }
 
 export function OpenRouterKeyCard() {
-    const [value, setValue] = useState(getOpenRouterKey);
+    useSettings(["plugins.DelexoPlugins.openRouterKey"]);
+    const stored = getOpenRouterKey();
+    const [value, setValue] = useState(stored);
     const [shown, setShown] = useState(false);
+
+    useEffect(() => {
+        setValue(stored);
+    }, [stored]);
+
+    useEffect(() => onUserDataReset(() => setValue("")), []);
 
     const save = () => {
         const key = setOpenRouterKey(value);
@@ -99,12 +109,12 @@ export function OpenRouterKeyCard() {
                         if (event.key === "Enter") save();
                     }}
                     placeholder="sk-or-v1-..."
-                    type={shown ? "text" : "password"}
+                    type="text"
+                    data-hidden={shown ? "false" : "true"}
                     autoComplete="off"
                     autoCorrect="off"
                     autoCapitalize="off"
                     spellCheck={false}
-                    name="void-openrouter-key"
                 />
                 <button
                     type="button"

@@ -6,7 +6,7 @@
 
 import { spawn } from "child_process";
 import { app } from "electron";
-import { existsSync, writeFileSync } from "original-fs";
+import { existsSync, readdirSync, writeFileSync } from "original-fs";
 import { homedir, tmpdir } from "os";
 import { basename, dirname, join } from "path";
 
@@ -22,15 +22,26 @@ export function scheduleReturnToDiscord() {
     }
 
     const appDir = dirname(process.execPath);
-    const resources = join(appDir, "resources");
-    const original = join(resources, "_app.asar");
-    if (!existsSync(original)) {
+    const localAppData = process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
+    const channels = ["Discord", "DiscordCanary", "DiscordPTB", "DiscordDevelopment"];
+    const hasBackup = channels.some(name => {
+        const root = join(localAppData, name);
+        if (!existsSync(root)) return false;
+        try {
+            return readdirSync(root).some(entry =>
+                entry.startsWith("app-") && existsSync(join(root, entry, "resources", "_app.asar"))
+            );
+        } catch {
+            return false;
+        }
+    });
+    if (!hasBackup) {
         throw new Error("Original Discord files were not found, so Void Client was left in place.");
     }
+    process.env.DISABLE_UPDATER_AUTO_PATCHING = "1";
 
     const updateExe = join(dirname(appDir), "Update.exe");
     const exeName = basename(process.execPath);
-    const localAppData = process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local");
     const scriptPath = join(tmpdir(), `void-client-uninstall-${process.pid}.ps1`);
     const targets = {
         dataDir: DATA_DIR,
@@ -125,30 +136,80 @@ function Wait-Ms([int]$ms) {
   }
 }
 
-function Get-OurDiscord {
-  $names = @('Discord.exe','DiscordCanary.exe','DiscordPTB.exe','DiscordDevelopment.exe')
+function Get-DiscordRoots {
   $found = @()
-  foreach ($name in $names) {
+  foreach ($name in @('Discord','DiscordCanary','DiscordPTB','DiscordDevelopment')) {
+    $dir = Join-Path $env:LOCALAPPDATA $name
+    if (Test-Path -LiteralPath $dir) { $found += $dir }
+  }
+  return @($found)
+}
+
+function Test-UnderRoot([string]$path, [string]$root) {
+  if (-not $path -or -not $root) { return $false }
+  $prefix = $root.TrimEnd('\\') + '\\'
+  return $path.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase) -or ($path.TrimEnd('\\') -eq $root.TrimEnd('\\'))
+}
+
+function Get-OurDiscord {
+  $roots = @(Get-DiscordRoots)
+  $found = @()
+  foreach ($name in @('Discord.exe','DiscordCanary.exe','DiscordPTB.exe','DiscordDevelopment.exe','Update.exe')) {
     $rows = @(Get-CimInstance Win32_Process -Filter "Name = '$name'" -ErrorAction SilentlyContinue)
     foreach ($row in $rows) {
       $path = [string]$row.ExecutablePath
-      if ($path -and $path.StartsWith($root, [StringComparison]::OrdinalIgnoreCase)) {
-        $found += [int]$row.ProcessId
+      foreach ($dir in $roots) {
+        if (Test-UnderRoot $path $dir) { $found += [int]$row.ProcessId }
       }
     }
   }
   return @($found | Select-Object -Unique)
 }
 
-function Stop-OurDiscord {
-  $ids = @(Get-OurDiscord)
-  foreach ($id in $ids) {
-    try { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue } catch {}
+function Test-DiscordAppOpen {
+  foreach ($name in @('Discord.exe','DiscordCanary.exe','DiscordPTB.exe','DiscordDevelopment.exe')) {
+    $rows = @(Get-CimInstance Win32_Process -Filter "Name = '$name'" -ErrorAction SilentlyContinue)
+    foreach ($row in $rows) {
+      foreach ($dir in @(Get-DiscordRoots)) {
+        if (Test-UnderRoot ([string]$row.ExecutablePath) $dir) { return $true }
+      }
+    }
   }
+  return $false
+}
+
+function Stop-OurDiscord {
   $deadline = [DateTime]::UtcNow.AddSeconds(25)
   while ((@(Get-OurDiscord).Count -gt 0) -and ([DateTime]::UtcNow -lt $deadline)) {
+    foreach ($id in @(Get-OurDiscord)) {
+      try { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue } catch {}
+    }
     Wait-Ms 250
   }
+}
+
+function Restore-OriginalAsar([string]$resources) {
+  $current = Join-Path $resources 'app.asar'
+  $backup = Join-Path $resources '_app.asar'
+  if (-not (Test-Path -LiteralPath $backup)) { return $true }
+  $backupFile = Get-Item -LiteralPath $backup
+  if ($backupFile.Length -lt 100000) { throw 'The saved Discord app is too small to restore.' }
+  if (Test-Path -LiteralPath $current) {
+    $live = Get-Item -LiteralPath $current -ErrorAction SilentlyContinue
+    if ($live) { $live.Attributes = 'Normal' }
+  }
+  for ($try = 0; $try -lt 30; $try++) {
+    try {
+      [System.IO.File]::Copy($backup, $current, $true)
+      $restored = Get-Item -LiteralPath $current
+      if ($restored.Length -eq $backupFile.Length) {
+        [System.IO.File]::Delete($backup)
+        return $true
+      }
+    } catch {}
+    Wait-Ms 400
+  }
+  return $false
 }
 
 function Remove-Tree([string]$path) {
@@ -177,7 +238,7 @@ $timer.Add_Tick({
   $timer.Stop()
   try {
     Update-Step 8 'Closing Void Client' 'Waiting for Discord to exit.'
-    $deadline = [DateTime]::UtcNow.AddSeconds(12)
+    $deadline = [DateTime]::UtcNow.AddSeconds(8)
     while ((@(Get-OurDiscord).Count -gt 0) -and ([DateTime]::UtcNow -lt $deadline)) {
       Wait-Ms 250
     }
@@ -188,28 +249,24 @@ $timer.Add_Tick({
     if (@(Get-OurDiscord).Count -gt 0) {
       throw 'Discord is still running. Quit it from the tray, then try uninstall again.'
     }
-    Wait-Ms 600
+    Wait-Ms 800
 
     Update-Step 36 'Restoring Discord' 'Putting the original Discord files back.'
-    $resources = Join-Path $root 'resources'
-    $injector = Join-Path $resources 'app.asar'
-    $original = Join-Path $resources '_app.asar'
-    $restored = $false
-    for ($i = 0; $i -lt 25; $i++) {
-      try {
-        if (Test-Path -LiteralPath $injector) { Remove-Item -LiteralPath $injector -Recurse -Force -ErrorAction Stop }
-        if ((Test-Path -LiteralPath $original) -and -not (Test-Path -LiteralPath $injector)) {
-          Rename-Item -LiteralPath $original -NewName 'app.asar' -ErrorAction Stop
+    $restoredAny = $false
+    foreach ($installRoot in @(Get-DiscordRoots)) {
+      $apps = @(Get-ChildItem -LiteralPath $installRoot -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'app-*' })
+      foreach ($appFolder in $apps) {
+        $resources = Join-Path $appFolder.FullName 'resources'
+        $backup = Join-Path $resources '_app.asar'
+        if (-not (Test-Path -LiteralPath $backup)) { continue }
+        if (-not (Restore-OriginalAsar $resources)) {
+          throw 'Original Discord could not be restored. Void Client was left in place.'
         }
-        if ((Test-Path -LiteralPath $injector) -and -not (Test-Path -LiteralPath $original)) {
-          $size = (Get-Item -LiteralPath $injector).Length
-          if ($size -gt 100000) { $restored = $true; break }
-        }
-      } catch {}
-      Wait-Ms 400
+        $restoredAny = $true
+      }
     }
-    if (-not $restored) {
-      throw 'Original Discord could not be restored. Void Client was left in place.'
+    if (-not $restoredAny) {
+      throw 'Original Discord files were not found, so Void Client was left in place.'
     }
 
     Update-Step 58 'Removing Void Client' 'Deleting settings and installed files.'
@@ -222,7 +279,9 @@ $timer.Add_Tick({
 
     Update-Step 74 'Removing Void Client' 'Deleting saved plugin files and shortcuts.'
     Remove-Tree $stalkerDir
+    Remove-Link (Join-Path $desktop 'Void Client.lnk')
     Remove-Link (Join-Path $desktop 'Void Client Installer.lnk')
+    Remove-Link (Join-Path $oneDriveDesktop 'Void Client.lnk')
     Remove-Link (Join-Path $oneDriveDesktop 'Void Client Installer.lnk')
     $programs = [Environment]::GetFolderPath('Programs')
     if ($programs -and (Test-Path -LiteralPath $programs)) {
@@ -238,7 +297,7 @@ $timer.Add_Tick({
       Start-Process -FilePath $update -ArgumentList @('--processStart', $exeName) -WorkingDirectory (Split-Path -Parent $update) | Out-Null
       $waitUntil = [DateTime]::UtcNow.AddSeconds(12)
       while ([DateTime]::UtcNow -lt $waitUntil) {
-        if (@(Get-OurDiscord).Count -gt 0) { $started = $true; break }
+        if (Test-DiscordAppOpen) { $started = $true; break }
         Wait-Ms 300
       }
     }
@@ -246,7 +305,7 @@ $timer.Add_Tick({
       Start-Process -FilePath $exe -WorkingDirectory $root | Out-Null
       $waitUntil = [DateTime]::UtcNow.AddSeconds(8)
       while ([DateTime]::UtcNow -lt $waitUntil) {
-        if (@(Get-OurDiscord).Count -gt 0) { $started = $true; break }
+        if (Test-DiscordAppOpen) { $started = $true; break }
         Wait-Ms 300
       }
     }

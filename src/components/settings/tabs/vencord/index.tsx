@@ -18,7 +18,7 @@
 
 import { clear as clearDataStore } from "@api/DataStore";
 import { openNotificationLogModal } from "@api/Notifications/notificationLog";
-import { useSettings } from "@api/Settings";
+import { clearInMemorySettings, useSettings } from "@api/Settings";
 import { Divider } from "@components/Divider";
 import { FormSwitch } from "@components/FormSwitch";
 import { FolderIcon, GithubIcon, LogIcon, PaintbrushIcon, ResetDataIcon, RestartIcon, UninstallIcon } from "@components/Icons";
@@ -323,11 +323,20 @@ function VencordSettings() {
                                     confirmText="Reset data"
                                     cancelText="Cancel"
                                     onConfirm={() => {
-                                        void clearDataStore()
-                                            .then(() => VencordNative.native.resetUserData())
-                                            .catch(err => {
-                                                showToast(String(err?.message || err || "Couldn't reset user data."), Toasts.Type.FAILURE);
-                                            });
+                                        void (async () => {
+                                            clearInMemorySettings();
+                                            const drop: string[] = [];
+                                            for (let i = 0; i < localStorage.length; i++) {
+                                                const key = localStorage.key(i);
+                                                if (key && /^(Vencord|Void)/i.test(key)) drop.push(key);
+                                            }
+                                            for (const key of drop) localStorage.removeItem(key);
+                                            await clearDataStore();
+                                            await VencordNative.native.resetUserData();
+                                            relaunch();
+                                        })().catch(err => {
+                                            showToast(String(err?.message || err || "Couldn't reset user data."), Toasts.Type.FAILURE);
+                                        });
                                     }}
                                 />
                             ))}
