@@ -48,6 +48,11 @@ export function registerTranslation(id: string, set: (text: string | undefined) 
     };
 }
 
+export function dismissTranslation(id: string) {
+    overlays.delete(id);
+    setters.get(id)?.(undefined);
+}
+
 function remember(id: string) {
     seen.add(id);
     if (seen.size > 400) {

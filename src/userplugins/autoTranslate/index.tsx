@@ -11,7 +11,7 @@ import { Message } from "@vencord/discord-types";
 import { Parser, useEffect, useState } from "@webpack/common";
 
 import { Delexo } from "../_delexo/author";
-import { arm, disarm, enqueueIncoming, getArmedChannel, registerTranslation, translationFor, useArmedChannel } from "./session";
+import { arm, disarm, dismissTranslation, enqueueIncoming, getArmedChannel, registerTranslation, translationFor, useArmedChannel } from "./session";
 import { settings } from "./settings";
 import managedStyle from "./style.css?managed";
 
@@ -55,12 +55,32 @@ function AutoTranslation({ message }: { message: Message; }) {
 
     useEffect(() => registerTranslation(message.id, setText), [message.id]);
 
+    useEffect(() => {
+        const row = document.getElementById(`chat-messages-${message.channel_id}-${message.id}`);
+        if (!text) {
+            row?.classList.remove(cl("tinted"));
+            return;
+        }
+        row?.classList.add(cl("tinted"));
+        return () => row?.classList.remove(cl("tinted"));
+    }, [text, message.channel_id, message.id]);
+
     if (!text) return null;
 
     return (
         <div className={cl("card")}>
-            <div>{Parser.parse(text)}</div>
-            <div className={cl("note")}>Auto-translate · only you</div>
+            <div className={cl("body")}>{Parser.parse(text)}</div>
+            <div className={cl("note")}>
+                Auto-translate · only you
+                {" · "}
+                <button
+                    type="button"
+                    className={cl("dismiss")}
+                    onClick={() => dismissTranslation(message.id)}
+                >
+                    Dismiss
+                </button>
+            </div>
         </div>
     );
 }
