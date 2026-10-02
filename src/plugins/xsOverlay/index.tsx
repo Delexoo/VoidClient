@@ -342,7 +342,7 @@ function sendMsgNotif(titleString: string, content: string, message: Message) {
                 content: content,
                 useBase64Icon: true,
                 icon: result,
-                sourceApp: "Vencord"
+                sourceApp: "Void Client"
             };
 
             sendToOverlay(msgData);
@@ -361,7 +361,7 @@ function sendOtherNotif(content: string, titleString: string) {
         content: content,
         useBase64Icon: false,
         icon: "default",
-        sourceApp: "Vencord"
+        sourceApp: "Void Client"
     };
     sendToOverlay(msgData);
 }
@@ -372,7 +372,7 @@ async function sendToOverlay(notif: NotificationObject) {
         return;
     }
     const apiObject: ApiObject = {
-        sender: "Vencord",
+        sender: "Void Client",
         target: "xsoverlay",
         command: "SendNotification",
         jsonData: JSON.stringify(notif),

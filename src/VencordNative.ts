@@ -80,6 +80,7 @@ export default {
         getVersions: () => process.versions as Partial<NodeJS.ProcessVersions>,
         supportsWindowsMaterial: () => sendSync<boolean>(IpcEvents.SUPPORTS_WINDOWS_MATERIAL),
         openExternal: (url: string) => invoke<void>(IpcEvents.OPEN_EXTERNAL, url),
+        uninstall: () => invoke<void>(IpcEvents.UNINSTALL),
         getRendererCss: () => invoke<string>(IpcEvents.GET_RENDERER_CSS),
         onRendererCssUpdate: (cb: (newCss: string) => void) => {
             if (!IS_DEV) return;

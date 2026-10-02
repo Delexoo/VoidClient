@@ -115,6 +115,7 @@ function ReactionUsers({ message, users }: { message: Message, users: User[]; })
 
 export default definePlugin({
     name: "WhoReacted",
+    enabledByDefault: true,
     description: "Renders the avatars of users who reacted to a message",
     tags: ["Reactions", "Chat", "Appearance"],
     authors: [Devs.Ven, Devs.KannaDev, Devs.newwares, Devs.paige],

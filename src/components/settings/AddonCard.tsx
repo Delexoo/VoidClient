@@ -21,6 +21,7 @@ import "./AddonCard.css";
 import { AddonBadge } from "@components/settings/PluginBadge";
 import { Switch } from "@components/Switch";
 import { classNameFactory } from "@utils/css";
+import { classes } from "@utils/misc";
 import { Text, useRef } from "@webpack/common";
 import type { MouseEventHandler, ReactNode } from "react";
 
@@ -32,6 +33,7 @@ interface Props {
     enabled: boolean;
     setEnabled: (enabled: boolean) => void;
     disabled?: boolean;
+    badge?: { text: string; color: string; };
     isNew?: boolean;
     onMouseEnter?: MouseEventHandler<HTMLDivElement>;
     onMouseLeave?: MouseEventHandler<HTMLDivElement>;
@@ -39,15 +41,16 @@ interface Props {
     infoButton?: ReactNode;
     footer?: ReactNode;
     author?: ReactNode;
+    className?: string;
 }
 
-export function AddonCard({ disabled, isNew, name, infoButton, footer, author, enabled, setEnabled, description, onMouseEnter, onMouseLeave }: Props) {
+export function AddonCard({ disabled, badge, name, infoButton, footer, author, enabled, setEnabled, description, onMouseEnter, onMouseLeave, className }: Props) {
     const titleRef = useRef<HTMLDivElement>(null);
     const titleContainerRef = useRef<HTMLDivElement>(null);
 
     return (
         <div
-            className={cl("card", { "card-disabled": disabled })}
+            className={classes(cl("card", { "card-disabled": disabled }), className)}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
         >
@@ -69,7 +72,7 @@ export function AddonCard({ disabled, isNew, name, infoButton, footer, author, e
                                 {name}
                             </div>
                         </div>
-                        {isNew && <AddonBadge text="NEW" color="#ED4245" />}
+                        {badge && <AddonBadge text={badge.text} color={badge.color} compact={badge.text === "API Required"} />}
                     </Text>
 
                     {!!author && (

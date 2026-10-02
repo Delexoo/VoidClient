@@ -1,6 +1,6 @@
-# Vencord + Delexo Plugins installer
+# Void Client installer
 
-Windows installer for official Vencord plus Delexo plugins.
+Windows installer for Void Client.
 
 ```bat
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o .\publish

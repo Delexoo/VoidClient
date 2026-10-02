@@ -24,6 +24,8 @@ import { React, useEffect } from "@webpack/common";
 
 import plugins from "~plugins";
 
+import { applyVoidClientPluginDefaults, VOID_CLIENT_ENABLED, VOID_CLIENT_PINNED_SET } from "./voidClientDefaults";
+
 const logger = new Logger("Settings");
 
 export interface SettingsPluginUiElement {
@@ -65,6 +67,22 @@ export interface Settings {
     windowsMaterial: "none" | "mica" | "tabbed" | "acrylic";
     disableMinSize: boolean;
     winNativeTitleBar: boolean;
+    /** Draw with the GPU. Turn off only if the window flickers or the GPU fans stay loud. */
+    hardwareAcceleration: boolean;
+    /** Decode and encode video on the GPU. Screenshare and video playback use this. */
+    hardwareVideoAcceleration: boolean;
+    /** Skip animated scrolling. The message list jumps instead of gliding. */
+    disableSmoothScroll: boolean;
+    /** Keep the window title as Void Client instead of the current channel. */
+    staticTitle: boolean;
+    /** Drop shadows around the window. */
+    windowShadow: boolean;
+    /** Rounded window corners on Windows 11. */
+    roundedCorners: boolean;
+    /** Cut CSS animation and hide a few promo buttons so the client does less work. */
+    lightweightUi: boolean;
+    /** One-time Void Client pin and enable defaults. */
+    voidClientPluginDefaults?: number;
     plugins: {
         [plugin: string]: {
             enabled: boolean;
@@ -108,6 +126,13 @@ const DefaultSettings: Settings = {
     windowsMaterial: "none",
     disableMinSize: false,
     winNativeTitleBar: false,
+    hardwareAcceleration: true,
+    hardwareVideoAcceleration: true,
+    disableSmoothScroll: true,
+    staticTitle: true,
+    windowShadow: true,
+    roundedCorners: true,
+    lightweightUi: true,
     plugins: {},
 
     uiElements: {
@@ -131,7 +156,9 @@ const DefaultSettings: Settings = {
 };
 
 const settings = !IS_REPORTER ? VencordNative.settings.get() : {} as Settings;
+const appliedVoidDefaults = !IS_REPORTER && applyVoidClientPluginDefaults(settings);
 mergeDefaults(settings, DefaultSettings);
+if (appliedVoidDefaults) VencordNative.settings.set(settings);
 
 export const SettingsStore = new SettingsStoreClass(settings, {
     readOnly: true,
@@ -145,7 +172,8 @@ export const SettingsStore = new SettingsStoreClass(settings, {
 
         if (path === "plugins" && key in plugins)
             return target[key] = {
-                enabled: IS_REPORTER || plugins[key].required || plugins[key].enabledByDefault || false
+                enabled: IS_REPORTER || plugins[key].required || plugins[key].enabledByDefault || VOID_CLIENT_ENABLED.has(key) || false,
+                ...(VOID_CLIENT_PINNED_SET.has(key) ? { isFavorite: true } : {})
             };
 
         // Since the property is not set, check if this is a plugin's setting and if so, try to resolve
@@ -153,6 +181,9 @@ export const SettingsStore = new SettingsStoreClass(settings, {
         if (path.startsWith("plugins.")) {
             const plugin = path.slice("plugins.".length);
             if (plugin in plugins) {
+                if (key === "isFavorite" && v == null && VOID_CLIENT_PINNED_SET.has(plugin))
+                    return (target[key] = true);
+
                 const setting = plugins[plugin].settings?.def[key];
                 if (!setting) return v;
 

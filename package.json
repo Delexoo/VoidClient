@@ -2,7 +2,7 @@
     "name": "vencord",
     "private": "true",
     "version": "1.15.3",
-    "description": "The cutest Discord client mod",
+    "description": "Void Client, a Discord client mod",
     "homepage": "https://github.com/Vendicated/Vencord#readme",
     "bugs": {
         "url": "https://github.com/Vendicated/Vencord/issues"

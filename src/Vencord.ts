@@ -126,7 +126,7 @@ async function runUpdateCheck() {
             await update();
             if (Settings.autoUpdateNotification) {
                 notify({
-                    title: "Vencord has been updated!",
+                    title: "Void Client has been updated!",
                     body: "Click here to restart",
                     onClick: relaunch
                 });
@@ -135,7 +135,7 @@ async function runUpdateCheck() {
         }
 
         notify({
-            title: "A Vencord update is available!",
+            title: "A Void Client update is available!",
             body: "Click here to view the update",
             onClick: () => openSettingsTabModal(UpdaterTab!)
         });
@@ -166,7 +166,7 @@ async function init() {
                 "Webpack has finished initialising, but some patches haven't been applied yet.",
                 "This might be expected since some Modules are lazy loaded, but please verify",
                 "that all plugins are working as intended.",
-                "You are seeing this warning because this is a Development build of Vencord.",
+                "You are seeing this warning because this is a Development build of Void Client.",
                 "\nThe following patches have not been applied:",
                 "\n\n" + pendingPatches.map(p => `${p.plugin}: ${p.find}`).join("\n")
             );
@@ -178,8 +178,65 @@ initStyles();
 startAllPlugins(StartAt.Init);
 init();
 
+const LIGHTWEIGHT_CSS = `
+html.vc-strict, html.vc-strict *, html.vc-strict *::before, html.vc-strict *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+    view-transition-name: none !important;
+}
+html.vc-lightweight [aria-label="Send a gift"],
+html.vc-lightweight [aria-label="Shop"] {
+    display: none !important;
+}
+`;
+
+function freezeMotion() {
+    const done = {
+        finished: Promise.resolve(),
+        ready: Promise.resolve(),
+        playState: "finished",
+        pending: false,
+        effect: null,
+        timeline: null,
+        startTime: 0,
+        currentTime: 0,
+        playbackRate: 1,
+        id: "",
+        onfinish: null,
+        oncancel: null,
+        onremove: null,
+        cancel() {},
+        finish() {},
+        play() {},
+        pause() {},
+        reverse() {},
+        persist() {},
+        commitStyles() {},
+        updatePlaybackRate() {},
+        addEventListener() {},
+        removeEventListener() {},
+        dispatchEvent() { return false; }
+    };
+    try {
+        Element.prototype.animate = function () { return done as unknown as Animation; };
+    } catch { /* ignore */ }
+}
+
+function applyLightweightUi() {
+    document.documentElement.classList.add("vc-strict");
+    document.documentElement.classList.toggle("vc-lightweight", Settings.lightweightUi !== false);
+}
+
+freezeMotion();
+if (document.documentElement) applyLightweightUi();
+
 document.addEventListener("DOMContentLoaded", () => {
     startAllPlugins(StartAt.DOMContentLoaded);
+
+    createAndAppendStyle("vencord-lightweight-style", coreStyleRootNode).textContent = LIGHTWEIGHT_CSS;
+    applyLightweightUi();
+    SettingsStore.addChangeListener("lightweightUi", applyLightweightUi);
 
     // FIXME
     if (IS_DISCORD_DESKTOP && Settings.winNativeTitleBar && IS_WINDOWS) {

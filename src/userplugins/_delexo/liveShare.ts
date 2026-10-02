@@ -7,7 +7,7 @@
 import { Constants, FluxDispatcher, RestAPI, SelectedGuildStore, UserProfileStore, UserStore } from "@webpack/common";
 
 import type { ShareState } from "../badges/share";
-import type { ButtonShare } from "../profileButton/share";
+import type { ButtonShare } from "./buttonShare";
 
 const WRITE_MS = 150;
 const POLL_MS = 15000;

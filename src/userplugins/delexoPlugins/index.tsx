@@ -32,7 +32,7 @@ function settingsApi() {
 
 export default definePlugin({
     name: "DelexoPlugins",
-    description: "Shows Delexo plugins in their own section above other plugins.",
+    description: "Shows Void Client plugins in their own section above other plugins.",
     authors: [Delexo],
     tags: ["Appearance"],
     enabledByDefault: true,

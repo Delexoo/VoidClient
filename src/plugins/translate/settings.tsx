@@ -22,6 +22,8 @@ import { OptionType } from "@utils/types";
 
 import { openTranslateModal } from "./TranslateModal";
 
+export const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
+
 export const settings = definePluginSettings({
     receivedInput: {
         type: OptionType.STRING,
@@ -47,28 +49,12 @@ export const settings = definePluginSettings({
         default: "en",
         hidden: true
     },
-    service: {
-        type: OptionType.SELECT,
-        description: IS_WEB ? "Translation provider (not available on web)" : "Translation provider",
-        hidden: IS_WEB,
-        options: [
-            { label: "Google Translate", value: "google", default: true },
-            { label: "DeepL Free — API key required", value: "deepl" },
-            { label: "DeepL Pro — API key required", value: "deepl-pro" },
-            { label: "Kagi Translate — API key required", value: "kagi" }
-        ] as const,
-        onChange: resetLanguageDefaults
-    },
-    deeplApiKey: {
+    openrouterModel: {
         type: OptionType.STRING,
-        displayName: "DeepL API Key",
-        description: "Your DeepL API key (from deepl.com/your-account)",
-        default: ""
-    },
-    kagiSession: {
-        type: OptionType.STRING,
-        description: "Your Kagi session token (from kagi.com/settings?p=user_details)",
-        default: ""
+        displayName: "OpenRouter model",
+        description: "OpenRouter model ID. Default is google/gemini-2.5-flash-lite.",
+        placeholder: DEFAULT_MODEL,
+        default: DEFAULT_MODEL
     },
     autoTranslate: {
         type: OptionType.BOOLEAN,
@@ -88,27 +74,14 @@ export const settings = definePluginSettings({
             </Button>
         )
     }
-}, {
-    deeplApiKey: {
-        hidden() { return this.store.service !== "deepl" && this.store.service !== "deepl-pro"; }
-    },
-    kagiSession: {
-        hidden() { return this.store.service !== "kagi"; }
-    }
 }).withPrivateSettings<{
     dismissedAutoTranslateAlert?: boolean;
+    service?: string;
 }>();
 
 export function resetLanguageDefaults() {
-    if (IS_WEB || settings.store.service === "google" || settings.store.service === "kagi") {
-        settings.store.receivedInput = "auto";
-        settings.store.receivedOutput = "en";
-        settings.store.sentInput = "auto";
-        settings.store.sentOutput = "en";
-    } else {
-        settings.store.receivedInput = "";
-        settings.store.receivedOutput = "en-us";
-        settings.store.sentInput = "";
-        settings.store.sentOutput = "en-us";
-    }
+    settings.store.receivedInput = "auto";
+    settings.store.receivedOutput = "en";
+    settings.store.sentInput = "auto";
+    settings.store.sentOutput = "en";
 }

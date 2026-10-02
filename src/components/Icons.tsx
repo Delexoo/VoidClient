@@ -381,6 +381,20 @@ export function LogIcon(props: IconProps) {
     );
 }
 
+export function UninstallIcon(props: IconProps) {
+    return (
+        <Icon
+            {...props}
+            viewBox="0 0 24 24"
+        >
+            <path
+                fill="currentColor"
+                d="M9 3h6a1 1 0 0 1 1 1v1h4a1 1 0 1 1 0 2h-1.05l-.72 12.2A2 2 0 0 1 16.24 21H7.76a2 2 0 0 1-1.99-1.8L5.05 7H4a1 1 0 0 1 0-2h4V4a1 1 0 0 1 1-1Zm1 2v0h4V5h-4Zm-2.93 2 .7 12h8.46l.7-12H7.07ZM10 9a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1Zm4 0a1 1 0 0 1 1 1v6a1 1 0 1 1-2 0v-6a1 1 0 0 1 1-1Z"
+            />
+        </Icon>
+    );
+}
+
 export function RestartIcon(props: IconProps) {
     return (
         <Icon

@@ -64,7 +64,9 @@
 }
 
 .vc-addon-title-container {
-    width: 100%;
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     height: 1.25em;
     position: relative;

@@ -32,11 +32,11 @@ import {
     decodeShare as decodeButtonShare,
     isHttpUrl,
     type ButtonShare
-} from "../profileButton/share";
+} from "../_delexo/buttonShare";
 import managedStyle from "./style.css?managed";
 
 const cl = classNameFactory("vc-profile-button-");
-const REGISTRY_URL = "https://raw.githubusercontent.com/Delexoo/Vencord/main/src/userplugins/profileButton/registry.json";
+const REGISTRY_URL = "https://raw.githubusercontent.com/Delexoo/VoidClient/main/src/userplugins/profileButton/registry.json";
 
 type ProfileArgs = BadgeUserArgs & {
     user_id?: string;
@@ -251,7 +251,7 @@ const profileBadge: ProfileBadge = {
 
 export default definePlugin({
     name: "DelexoShare",
-    description: "Shows Delexo profile badges and profile buttons for every Vencord user.",
+    description: "Shows Delexo profile badges and profile buttons for every Void Client user.",
     authors: [Delexo],
     required: true,
     hidden: true,

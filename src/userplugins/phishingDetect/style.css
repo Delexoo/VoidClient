@@ -1,0 +1,172 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Delexo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-pd-overlay {
+    position: fixed;
+    z-index: 100000;
+    pointer-events: none;
+    box-sizing: border-box;
+}
+
+.vc-pd-overlay .vc-pd-banner {
+    pointer-events: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.vc-pd-banner {
+    margin: 0 0 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.vc-pd-banner.vc-pd-safe {
+    background: color-mix(in srgb, var(--status-positive, #23a559) 16%, transparent);
+    border-color: color-mix(in srgb, var(--status-positive, #23a559) 45%, transparent);
+}
+
+.vc-pd-banner.vc-pd-suspicious {
+    background: color-mix(in srgb, var(--status-warning, #f0b232) 16%, transparent);
+    border-color: color-mix(in srgb, var(--status-warning, #f0b232) 50%, transparent);
+}
+
+.vc-pd-banner.vc-pd-malicious {
+    background: color-mix(in srgb, var(--status-danger, #f23f43) 18%, transparent);
+    border-color: color-mix(in srgb, var(--status-danger, #f23f43) 55%, transparent);
+}
+
+.vc-pd-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.vc-pd-pill {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.vc-pd-safe .vc-pd-pill {
+    background: var(--status-positive, #23a559);
+    color: #fff;
+}
+
+.vc-pd-suspicious .vc-pd-pill {
+    background: var(--status-warning, #f0b232);
+    color: #111;
+}
+
+.vc-pd-malicious .vc-pd-pill {
+    background: var(--status-danger, #f23f43);
+    color: #fff;
+}
+
+.vc-pd-src {
+    font-size: 11px;
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-pd-summary {
+    font-weight: 650;
+    color: var(--header-primary, #f2f3f5);
+}
+
+.vc-pd-reasons {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    color: var(--text-default, #dbdee1);
+}
+
+.vc-pd-reasons li + li {
+    margin-top: 2px;
+}
+
+.vc-pd-msg {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+.vc-pd-msg.vc-pd-safe {
+    background: color-mix(in srgb, var(--status-positive, #23a559) 12%, transparent);
+}
+
+.vc-pd-msg.vc-pd-suspicious {
+    background: color-mix(in srgb, var(--status-warning, #f0b232) 12%, transparent);
+}
+
+.vc-pd-msg.vc-pd-malicious {
+    background: color-mix(in srgb, var(--status-danger, #f23f43) 14%, transparent);
+}
+
+.vc-pd-key {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.vc-pd-key-title {
+    color: var(--header-primary, #f2f3f5);
+    font-weight: 600;
+}
+
+.vc-pd-key-desc {
+    color: var(--header-secondary, #b5bac1);
+    font-size: 13px;
+}
+
+.vc-pd-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-pd-key-input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    background: var(--input-background, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-size: 16px;
+    outline: none;
+}
+
+.vc-pd-key-input:focus {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-pd-key-eye {
+    appearance: none;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    border-radius: 8px;
+    background: var(--input-background, #1e1f22);
+    color: var(--interactive-normal, #b5bac1);
+    cursor: pointer;
+}

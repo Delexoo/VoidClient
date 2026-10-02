@@ -1,0 +1,274 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Delexo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-yt-panel {
+    position: fixed;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+    min-width: 300px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0f0f0f;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: var(--elevation-high, 0 10px 28px rgba(0, 0, 0, 0.45));
+    color: var(--text-default, #dbdee1);
+    font-family: var(--font-primary, "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif);
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.vc-yt-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 32px;
+    padding: 0 6px 0 10px;
+    background: #0f0f0f;
+    cursor: grab;
+    user-select: none;
+}
+
+.vc-yt-head:active {
+    cursor: grabbing;
+}
+
+.vc-yt-mark {
+    flex: none;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+}
+
+.vc-yt-titles {
+    min-width: 0;
+    flex: 1;
+}
+
+.vc-yt-title {
+    color: #f2f3f5;
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 16px;
+}
+
+.vc-yt-icon,
+.vc-yt-text {
+    border: 0;
+    background: transparent;
+    color: var(--interactive-normal, #b5bac1);
+    cursor: pointer;
+    font: inherit;
+}
+
+.vc-yt-icon {
+    flex: none;
+    width: 24px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    border-radius: 4px;
+    padding: 0;
+}
+
+.vc-yt-icon:hover:not(:disabled),
+.vc-yt-text:hover:not(:disabled) {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.08));
+}
+
+.vc-yt-icon:disabled,
+.vc-yt-text:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.vc-yt-load {
+    height: 2px;
+    background: #ff4d4d;
+}
+
+.vc-yt-text {
+    height: 22px;
+    padding: 0 8px;
+    border-radius: 999px;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.vc-yt-connect {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: min(280px, 100%);
+}
+
+.vc-yt-connect-title {
+    color: #f2f3f5;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+.vc-yt-go {
+    width: 100%;
+    height: 36px;
+    border: 0;
+    border-radius: 8px;
+    background: #272727;
+    color: #f2f3f5;
+    cursor: pointer;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.vc-yt-go:hover:not(:disabled) {
+    background: #3f3f3f;
+}
+
+.vc-yt-go:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.vc-yt-go-primary {
+    background: #ff4d4d;
+    color: #fff;
+}
+
+.vc-yt-go-primary:hover:not(:disabled) {
+    background: #ff6a6a;
+}
+
+.vc-yt-connect-note {
+    color: #b5bac1;
+    font-size: 12px;
+    line-height: 16px;
+    text-align: center;
+}
+
+.vc-yt-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    margin: 0 8px 8px 0;
+}
+
+.vc-yt-stage {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    background: #0f0f0f;
+    color: #b5bac1;
+    text-align: center;
+}
+
+.vc-yt-stage > span {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    padding: 16px;
+    pointer-events: none;
+}
+
+.vc-yt-view {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border: 0;
+    background: #0f0f0f;
+}
+
+.vc-yt-e {
+    position: absolute;
+    top: 32px;
+    right: 0;
+    bottom: 0;
+    width: 8px;
+    z-index: 3;
+    cursor: ew-resize;
+}
+
+.vc-yt-s {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 8px;
+    z-index: 3;
+    cursor: ns-resize;
+}
+
+.vc-yt-se {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 14px;
+    height: 14px;
+    cursor: nwse-resize;
+    z-index: 2;
+}
+
+.vc-yt-se::after {
+    content: "";
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid rgba(255, 255, 255, 0.45);
+    border-bottom: 2px solid rgba(255, 255, 255, 0.45);
+}
+
+.vc-yt-nav {
+    margin: 1px 8px;
+}
+
+.vc-yt-nav-btn {
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px 8px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--channels-default, #949ba4);
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.vc-yt-nav-btn:hover,
+.vc-yt-nav-on {
+    background: var(--background-modifier-hover, rgba(79, 84, 92, 0.16));
+    color: var(--interactive-hover, #dbdee1);
+}
+
+.vc-yt-nav-on {
+    background: var(--background-modifier-selected, rgba(79, 84, 92, 0.32));
+    color: var(--interactive-active, #f2f3f5);
+}
+
+.vc-yt-nav-label {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 20px;
+}
+
+.vc-yt-settings p {
+    margin: 0 0 10px;
+    color: var(--text-muted, #b5bac1);
+    font-size: 13px;
+    line-height: 1.4;
+}

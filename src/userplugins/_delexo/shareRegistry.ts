@@ -7,11 +7,11 @@
 import type { PluginNative } from "@utils/types";
 
 import { unpackState, type ShareState } from "../badges/share";
-import { isHttpUrl, type ButtonShare } from "../profileButton/share";
+import { isHttpUrl, type ButtonShare } from "./buttonShare";
 import { getOwnBadgeShare, getOwnButtonShare, setOwnBadgeShare, setOwnButtonShare } from "./liveShare";
 
 const Native = VencordNative.pluginHelpers.DelexoShare as PluginNative<typeof import("../delexoShare/native")> | undefined;
-const RAW_URL = "https://raw.githubusercontent.com/Delexoo/Vencord/main/src/userplugins/_delexo/shareRegistry.json";
+const RAW_URL = "https://raw.githubusercontent.com/Delexoo/VoidClient/main/src/userplugins/_delexo/shareRegistry.json";
 const REFRESH_MIN_MS = 10 * 60 * 1000;
 
 type Registry = {

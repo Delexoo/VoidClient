@@ -1,0 +1,49 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Delexo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-at-switch {
+    width: 28px;
+    height: 16px;
+    display: block;
+    position: relative;
+    border-radius: 99px;
+    background: var(--background-modifier-accent, rgba(255, 255, 255, 0.16));
+}
+
+.vc-at-switch.vc-at-on {
+    background: var(--status-positive-background, #23a559);
+}
+
+.vc-at-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--white-500, #fff);
+}
+
+.vc-at-switch.vc-at-on .vc-at-knob {
+    left: 14px;
+}
+
+.vc-at-card {
+    margin-top: 4px;
+    color: var(--text-default, var(--text-normal, #dbdee1));
+    font-size: 1rem;
+    line-height: 1.375rem;
+    white-space: break-spaces;
+    word-wrap: break-word;
+}
+
+.vc-at-note {
+    margin-top: 2px;
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
+    font-style: italic;
+    line-height: 16px;
+}

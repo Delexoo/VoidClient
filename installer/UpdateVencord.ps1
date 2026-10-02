@@ -21,7 +21,7 @@ $EnvFile = Join-Path $InstallRoot ".env"
 $LogFile = Join-Path $ToolsDir "update-vencord.log"
 # Overlay every folder under src/userplugins (Delexo addons). Official plugins stay untouched.
 $UpstreamUrl = "https://github.com/Vendicated/Vencord.git"
-$PluginsRepo = "https://github.com/Delexoo/Vencord.git"
+$PluginsRepo = "https://github.com/Delexoo/VoidClient.git"
 $AppDataDist = Join-Path $env:APPDATA "Vencord\dist"
 $DiscordRoot = Join-Path $env:LOCALAPPDATA "Discord"
 
@@ -312,12 +312,12 @@ try {
         Invoke-GitCleanNonInteractive
         [void](Invoke-Native "git.exe" @("branch", "--set-upstream-to=origin/dev", "dev") -AllowFail)
 
-        Write-Log "Pulling plugins from Delexoo/Vencord"
+        Write-Log "Pulling plugins from Delexoo/VoidClient"
         $tmp = Join-Path $env:TEMP ("vencord-plugins-" + [guid]::NewGuid().ToString("n"))
         $pulled = $false
         try {
             $cloneUrl = if ($token) {
-                "https://x-access-token:${token}@github.com/Delexoo/Vencord.git"
+                "https://x-access-token:${token}@github.com/Delexoo/VoidClient.git"
             } else {
                 $PluginsRepo
             }

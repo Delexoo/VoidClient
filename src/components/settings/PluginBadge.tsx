@@ -16,13 +16,16 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-export function AddonBadge({ text, color }) {
+export function AddonBadge({ text, color, compact }: { text: string; color: string; compact?: boolean; }) {
     return (
-        <div className="vc-addon-badge" style={{
-            backgroundColor: color,
-            justifySelf: "flex-end",
-            marginLeft: "auto"
-        }}>
+        <div
+            className={compact ? "vc-addon-badge vc-addon-badge-compact" : "vc-addon-badge"}
+            style={{
+                backgroundColor: color,
+                justifySelf: "flex-end",
+                marginLeft: compact ? undefined : "auto"
+            }}
+        >
             {text}
         </div>
     );

@@ -35,6 +35,7 @@ export const enum IpcEvents {
     OPEN_EXTERNAL = "VencordOpenExternal",
     OPEN_THEMES_FOLDER = "VencordOpenThemesFolder",
     OPEN_SETTINGS_FOLDER = "VencordOpenSettingsFolder",
+    UNINSTALL = "VencordUninstall",
 
     GET_UPDATES = "VencordGetUpdates",
     GET_REPO = "VencordGetRepo",

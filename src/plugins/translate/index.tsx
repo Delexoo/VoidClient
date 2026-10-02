@@ -22,12 +22,13 @@ import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/Co
 import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Message } from "@vencord/discord-types";
-import { ChannelStore, Menu } from "@webpack/common";
+import { ChannelStore, Menu, SelectedChannelStore } from "@webpack/common";
 
 import { settings } from "./settings";
 import { setShouldShowTranslateEnabledTooltip, TranslateChatBarIcon, TranslateIcon } from "./TranslateIcon";
-import { handleTranslate, TranslationAccessory } from "./TranslationAccessory";
+import { clearTranslations, handleTranslate, TranslationAccessory } from "./TranslationAccessory";
 import { translate } from "./utils";
+import { renderVoiceHover } from "./voiceHover";
 
 const messageCtxPatch: NavContextMenuPatchCallback = (children, { message }: { message: Message; }) => {
     const content = getMessageContent(message);
@@ -61,13 +62,42 @@ function getMessageContent(message: Message) {
 }
 
 let tooltipTimeout: any;
+let openChannel: string | undefined;
 
 export default definePlugin({
     name: "Translate",
-    description: "Translate messages with Google Translate, DeepL or Kagi.",
-    tags: ["Chat", "Utility"],
+    enabledByDefault: true,
+    description: "Translate messages with OpenRouter. Hover a voice message to translate what was said.",
+    tags: ["Chat", "Utility", "API Required"],
     authors: [Devs.Ven, Devs.AshtonMemer, Devs.koish1],
     settings,
+    patches: [
+        {
+            find: "#{intl::VOICE_MESSAGES_PLAYBACK_RATE_LABEL}",
+            replacement: {
+                match: /(?<=onVolumeHide:\i\}\))/,
+                replace: ",$self.VoiceHover(arguments[0])"
+            }
+        }
+    ],
+    VoiceHover: renderVoiceHover,
+
+    start() {
+        openChannel = SelectedChannelStore.getChannelId() || undefined;
+    },
+
+    stop() {
+        clearTranslations();
+        openChannel = undefined;
+    },
+
+    flux: {
+        CHANNEL_SELECT({ channelId }: { channelId?: string | null; }) {
+            const next = channelId || undefined;
+            if (openChannel && next !== openChannel) clearTranslations();
+            openChannel = next;
+        }
+    },
     contextMenus: {
         "message": messageCtxPatch
     },

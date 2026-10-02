@@ -22,10 +22,27 @@ import { Parser, useEffect, useState } from "@webpack/common";
 import { TranslateIcon } from "./TranslateIcon";
 import { cl, TranslationValue } from "./utils";
 
-const TranslationSetters = new Map<string, (v: TranslationValue) => void>();
+const TranslationSetters = new Map<string, (v: TranslationValue | undefined) => void>();
+const pendingTranslations = new Map<string, TranslationValue | undefined>();
+const epochs = new Map<string, number>();
 
-export function handleTranslate(messageId: string, data: TranslationValue) {
-    TranslationSetters.get(messageId)!(data);
+export function translationEpoch(messageId: string) {
+    return epochs.get(messageId) || 0;
+}
+
+export function handleTranslate(messageId: string, data: TranslationValue | undefined) {
+    if (data === undefined) epochs.set(messageId, translationEpoch(messageId) + 1);
+    pendingTranslations.set(messageId, data);
+    TranslationSetters.get(messageId)?.(data);
+}
+
+export function clearTranslations() {
+    for (const id of new Set([...pendingTranslations.keys(), ...TranslationSetters.keys()])) {
+        epochs.set(id, translationEpoch(id) + 1);
+        pendingTranslations.delete(id);
+        TranslationSetters.get(id)?.(undefined);
+    }
+    document.querySelectorAll(".vc-trans-tinted").forEach(node => node.classList.remove("vc-trans-tinted"));
 }
 
 function Dismiss({ onDismiss }: { onDismiss: () => void; }) {
@@ -47,18 +64,35 @@ export function TranslationAccessory({ message }: { message: Message; }) {
         if ((message as any).vencordEmbeddedBy) return;
 
         TranslationSetters.set(message.id, setTranslation);
+        if (pendingTranslations.has(message.id))
+            setTranslation(pendingTranslations.get(message.id));
 
         return () => void TranslationSetters.delete(message.id);
     }, []);
 
-    if (!translation) return null;
+    useEffect(() => {
+        const row = document.getElementById(`chat-messages-${message.channel_id}-${message.id}`);
+        if (!translation?.text) {
+            row?.classList.remove("vc-trans-tinted");
+            return;
+        }
+        row?.classList.add("vc-trans-tinted");
+        return () => row?.classList.remove("vc-trans-tinted");
+    }, [translation, message.channel_id, message.id]);
+
+    if (!translation?.text) return null;
+
+    const listening = translation.text === "Listening…";
 
     return (
         <span className={cl("accessory")}>
             <TranslateIcon width={16} height={16} className={cl("accessory-icon")} />
-            {Parser.parse(translation.text)}
+            {listening ? "Listening…" : Parser.parse(translation.text)}
             <br />
-            (translated from {translation.sourceLanguage} - <Dismiss onDismiss={() => setTranslation(undefined)} />)
+            {listening
+                ? <>(only you - <Dismiss onDismiss={() => handleTranslate(message.id, undefined)} />)</>
+                : <>(translated from {translation.sourceLanguage} [OpenRouter] - <Dismiss onDismiss={() => handleTranslate(message.id, undefined)} />)</>
+            }
         </span>
     );
 }

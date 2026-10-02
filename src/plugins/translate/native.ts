@@ -52,3 +52,81 @@ export async function makeKagiTranslateRequest(_: IpcMainInvokeEvent, token: str
         return { status: -1, data: String(e) };
     }
 }
+
+export async function makeOpenRouterAudioRequest(
+    _: IpcMainInvokeEvent,
+    apiKey: string,
+    model: string,
+    prompt: string,
+    audioBase64: string,
+    format: string
+) {
+    try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
+                "X-OpenRouter-Title": "Translate"
+            },
+            body: JSON.stringify({
+                model,
+                temperature: 0.1,
+                max_tokens: 2048,
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: prompt },
+                            {
+                                type: "input_audio",
+                                input_audio: {
+                                    data: audioBase64,
+                                    format
+                                }
+                            }
+                        ]
+                    }
+                ]
+            })
+        });
+        const data = await res.text();
+        return { status: res.status, data };
+    } catch (e) {
+        return { status: -1, data: String(e) };
+    }
+}
+
+export async function makeOpenRouterTranslateRequest(
+    _: IpcMainInvokeEvent,
+    apiKey: string,
+    model: string,
+    system: string,
+    user: string
+) {
+    try {
+        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
+                "X-OpenRouter-Title": "Translate"
+            },
+            body: JSON.stringify({
+                model,
+                temperature: 0.2,
+                max_tokens: 4096,
+                messages: [
+                    { role: "system", content: system },
+                    { role: "user", content: user }
+                ]
+            })
+        });
+        const data = await res.text();
+        return { status: res.status, data };
+    } catch (e) {
+        return { status: -1, data: String(e) };
+    }
+}

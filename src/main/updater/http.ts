@@ -46,30 +46,53 @@ async function calculateGitChanges() {
     const isOutdated = await fetchUpdates();
     if (!isOutdated) return [];
 
-    const data = await githubGet(`/compare/${gitHash}...HEAD`);
+    try {
+        const data = await githubGet(`/compare/${gitHash}...HEAD`);
+        const commits = data.commits.map((c: any) => ({
+            hash: c.sha.slice(0, 7),
+            author: c.author?.login ?? c.commit?.author?.name ?? "Unknown Author",
+            message: c.commit.message.split("\n")[0]
+        }));
+        if (commits.length) return commits;
+    } catch {
+        // The installed build may not be on the remote yet.
+    }
 
-    return data.commits.map((c: any) => ({
-        // github api only sends the long sha
-        hash: c.sha.slice(0, 7),
-        author: c.author?.login ?? c.commit?.author?.name ?? "Unknown Author",
-        message: c.commit.message.split("\n")[0]
-    }));
+    return [{
+        hash: "update",
+        author: "Void Client",
+        message: "A newer build is on GitHub"
+    }];
+}
+
+async function latestRelease() {
+    try {
+        return await githubGet("/releases/tags/void-client");
+    } catch {
+        return await githubGet("/releases/latest");
+    }
 }
 
 async function fetchUpdates() {
-    const data = await githubGet("/releases/latest");
+    let data: any;
+    try {
+        data = await latestRelease();
+    } catch {
+        return false;
+    }
 
-    const hash = data.name.slice(data.name.lastIndexOf(" ") + 1);
-    if (hash === gitHash)
+    const name = String(data?.name || "");
+    const hash = name.slice(name.lastIndexOf(" ") + 1);
+    if (hash && hash === gitHash)
         return false;
 
-    data.assets.forEach(({ name, browser_download_url }) => {
-        if (VENCORD_FILES.some(s => name.startsWith(s))) {
-            PendingUpdates.push([name, browser_download_url]);
-        }
-    });
+    PendingUpdates = [];
+    for (const asset of data?.assets || []) {
+        if (VENCORD_FILES.some(file => String(asset.name).startsWith(file)))
+            PendingUpdates.push([asset.name, asset.browser_download_url]);
+    }
 
-    return true;
+    return PendingUpdates.length > 0;
 }
 
 async function applyUpdates() {

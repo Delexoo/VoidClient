@@ -12,6 +12,7 @@ export default definePlugin({
     authors: [Devs.AutumnVN],
     description: "Disables the CPU-intensive typing dots animation",
     tags: ["Appearance"],
+    enabledByDefault: true,
     patches: [
         {
             find: "dotCycle",

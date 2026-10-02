@@ -22,14 +22,11 @@
     gap: 0.5em;
     padding: 8px 9px;
     border-radius: 8px;
-    transition: 0.1s ease-out;
     box-sizing: border-box;
 }
 
 .vc-settings-quickActions-pill:hover {
     background: var(--control-secondary-background-hover);
-    transform: translateY(-1px);
-    box-shadow: var(--elevation-high);
 }
 
 .vc-settings-quickActions-pill:focus-visible {
@@ -40,4 +37,15 @@
 .vc-settings-quickActions-img {
     width: 24px;
     height: 24px;
+}
+
+.vc-settings-quickActions-pill.vc-uninstall,
+.vc-settings-quickActions-pill.vc-uninstall:hover,
+.vc-settings-quickActions-pill.vc-uninstall:focus-visible {
+    background: #da373c;
+    color: #fff;
+}
+
+.vc-settings-quickActions-pill.vc-uninstall:hover {
+    background: #a12828;
 }

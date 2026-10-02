@@ -18,7 +18,6 @@
 
 import "./styles.css";
 
-import * as DataStore from "@api/DataStore";
 import { isPluginEnabled } from "@api/PluginManager";
 import { useSettings } from "@api/Settings";
 import { Card } from "@components/Card";
@@ -34,14 +33,15 @@ import { Logger } from "@utils/Logger";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { PluginTarget } from "@utils/pluginTargets";
-import { useAwaiter, useCleanupEffect } from "@utils/react";
+import { useCleanupEffect } from "@utils/react";
 import { PluginTag, PluginTags } from "@utils/types";
-import { Button, ConfirmModal, lodash, openModal, Parser, React, SearchableSelect, Select, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
+import { Button, ConfirmModal, openModal, Parser, React, SearchableSelect, Select, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
 import { JSX } from "react";
 
 import Plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
 
 import { PluginCard } from "./PluginCard";
+import { OpenRouterKeyCard } from "./OpenRouterKeyCard";
 import { UIElementsButton } from "./UIElements";
 
 export const cl = classNameFactory("vc-plugins-");
@@ -78,7 +78,6 @@ const enum SearchStatus {
     FAVORITES,
     ENABLED,
     DISABLED,
-    NEW,
     USER_PLUGINS,
     API_PLUGINS
 }
@@ -94,8 +93,8 @@ function ExcludedPluginsList({ search }: { search: string; }) {
         discordDesktop: "Discord Desktop app",
         vesktop: "Vesktop app",
         web: "Vesktop app and the Web version of Discord",
-        dev: "Developer version of Vencord",
-        browser: "Web Browser version of Vencord"
+        dev: "Developer version of Void Client",
+        browser: "Web Browser version of Void Client"
     };
 
     return (
@@ -186,9 +185,6 @@ function PluginSettings() {
             case SearchStatus.ENABLED:
                 if (!isPluginEnabled(plugin.name)) return false;
                 break;
-            case SearchStatus.NEW:
-                if (!newPlugins?.includes(plugin.name)) return false;
-                break;
             case SearchStatus.USER_PLUGINS:
                 if (!PluginMeta[plugin.name]?.userPlugin) return false;
                 break;
@@ -209,23 +205,6 @@ function PluginSettings() {
         );
     };
 
-    const [newPlugins] = useAwaiter(() => DataStore.get("Vencord_existingPlugins").then((cachedPlugins: Record<string, number> | undefined) => {
-        const now = Date.now() / 1000;
-        const existingTimestamps: Record<string, number> = {};
-        const sortedPluginNames = Object.values(sortedPlugins).map(plugin => plugin.name);
-
-        const newPlugins: string[] = [];
-        for (const { name: p } of sortedPlugins) {
-            const time = existingTimestamps[p] = cachedPlugins?.[p] ?? now;
-            if ((time + 60 * 60 * 24 * 2) > now) {
-                newPlugins.push(p);
-            }
-        }
-        DataStore.set("Vencord_existingPlugins", existingTimestamps);
-
-        return lodash.isEqual(newPlugins, sortedPluginNames) ? [] : newPlugins;
-    }));
-
     const plugins = [] as JSX.Element[];
     const requiredPlugins = [] as JSX.Element[];
 
@@ -240,7 +219,7 @@ function PluginSettings() {
 
         if (isRequired) {
             const tooltipText = p.required || !depMap[p.name]
-                ? "This plugin is required for Vencord to function."
+                ? "This plugin is required for Void Client to function."
                 : makeDependencyList(depMap[p.name]?.filter(d => settings.plugins[d].enabled));
 
             requiredPlugins.push(
@@ -263,7 +242,6 @@ function PluginSettings() {
                     onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
                     disabled={false}
                     plugin={p}
-                    isNew={newPlugins?.includes(p.name)}
                     key={p.name}
                 />
             );
@@ -272,6 +250,8 @@ function PluginSettings() {
 
     return (
         <SettingsTab>
+            <OpenRouterKeyCard />
+
             <ReloadRequiredCard required={changes.hasChanges} />
 
             <UIElementsButton />
@@ -298,7 +278,6 @@ function PluginSettings() {
                             { label: "Show Favorites", value: SearchStatus.FAVORITES },
                             { label: "Show Enabled", value: SearchStatus.ENABLED },
                             { label: "Show Disabled", value: SearchStatus.DISABLED },
-                            { label: "Show New", value: SearchStatus.NEW },
                             hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },
                             { label: "Show API Plugins", value: SearchStatus.API_PLUGINS },
                         ].filter(isTruthy)}

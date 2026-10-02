@@ -1,0 +1,253 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Delexo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-tfh-hidden {
+    display: none !important;
+}
+
+.vc-tfh-card {
+    margin-top: 2px;
+    color: var(--text-default, var(--text-normal, #dbdee1));
+    font-size: 1rem;
+    line-height: 1.375rem;
+    white-space: break-spaces;
+    word-wrap: break-word;
+}
+
+.vc-tfh-body {
+    color: var(--text-default, var(--text-normal, #dbdee1));
+}
+
+.vc-tfh-foot {
+    margin-top: 4px;
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
+    font-style: italic;
+    line-height: 16px;
+}
+
+.vc-tfh-dismiss {
+    all: unset;
+    cursor: pointer;
+    color: var(--text-link, #00a8fc);
+}
+
+.vc-tfh-dismiss:is(:hover, :focus) {
+    text-decoration: underline;
+}
+
+.vc-tfh-bar {
+    position: fixed;
+    z-index: 10000;
+    left: 50%;
+    bottom: 76px;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: min(520px, calc(100vw - 24px));
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-surface-high, #2b2d31));
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    box-shadow: var(--elevation-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    color: var(--text-default, #dbdee1);
+    font-family: var(--font-primary, Whitney, "gg sans", "Noto Sans", sans-serif);
+}
+
+.vc-tfh-bar-text {
+    min-width: 0;
+    flex: 1;
+}
+
+.vc-tfh-bar-title {
+    color: var(--header-primary, #f2f3f5);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 18px;
+}
+
+.vc-tfh-bar-meta {
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
+    line-height: 16px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vc-tfh-langbtn {
+    appearance: none;
+    min-width: 40px;
+    height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.06));
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+}
+
+.vc-tfh-langbtn:hover,
+.vc-tfh-langbtn[aria-expanded="true"] {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-selected, rgba(255, 255, 255, 0.1));
+}
+
+.vc-tfh-langbtn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.vc-tfh-dismiss-all {
+    appearance: none;
+    height: 32px;
+    padding: 0 12px;
+    border: 0;
+    border-radius: 4px;
+    background: var(--button-secondary-background, #4e5058);
+    color: var(--header-primary, #fff);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.vc-tfh-dismiss-all:hover {
+    background: var(--button-secondary-background-hover, #6d6f78);
+}
+
+.vc-tfh-picker {
+    position: fixed;
+    z-index: 10001;
+    width: 280px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-surface-high, #111214));
+    box-shadow: var(--elevation-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    color: var(--text-default, #dbdee1);
+    font-family: var(--font-primary, Whitney, "gg sans", "Noto Sans", sans-serif);
+}
+
+.vc-tfh-picker-title {
+    margin: 0 0 10px;
+    color: var(--header-primary, #f2f3f5);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.vc-tfh-quick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.vc-tfh-chip {
+    appearance: none;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    border-radius: 6px;
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.04));
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vc-tfh-chip:hover {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-selected, rgba(255, 255, 255, 0.08));
+}
+
+.vc-tfh-chip.vc-tfh-selected {
+    color: var(--white-500, #fff);
+    background: var(--brand-500, #5865f2);
+    border-color: transparent;
+}
+
+.vc-tfh-search {
+    width: 100%;
+    height: 34px;
+    margin-bottom: 8px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    background: var(--input-background, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.vc-tfh-list {
+    max-height: 220px;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.2)) transparent;
+}
+
+.vc-tfh-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.vc-tfh-list::-webkit-scrollbar-button {
+    display: none !important;
+}
+
+.vc-tfh-list::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.18));
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 8px;
+}
+
+.vc-tfh-option {
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.vc-tfh-option:hover {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.06));
+    color: var(--interactive-hover, #fff);
+}
+
+.vc-tfh-option.vc-tfh-selected {
+    color: var(--white-500, #fff);
+    background: var(--background-modifier-selected, rgba(88, 101, 242, 0.24));
+}
+
+.vc-tfh-option-code {
+    color: var(--text-muted, #949ba4);
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.vc-tfh-empty {
+    padding: 12px 8px;
+    color: var(--text-muted, #949ba4);
+    font-size: 13px;
+    text-align: center;
+}

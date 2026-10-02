@@ -15,19 +15,41 @@ import { React, showToast, Toasts } from "@webpack/common";
 import { cl, logger } from ".";
 import { openPluginModal } from "./PluginModal";
 
+function PinIcon({ filled }: { filled: boolean; }) {
+    return (
+        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+                fill={filled ? "currentColor" : "none"}
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+                d="M9 4h6v5.2l2.2 2.3H6.8L9 9.2V4zM12 11.5V20"
+            />
+        </svg>
+    );
+}
+
 interface PluginCardProps extends React.HTMLProps<HTMLDivElement> {
     plugin: Plugin;
     disabled: boolean;
     onRestartNeeded(name: string, key: string): void;
-    isNew?: boolean;
 }
 
-export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave, isNew }: PluginCardProps) {
+export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, onMouseLeave }: PluginCardProps) {
     const settings = Settings.plugins[plugin.name];
+    const pinned = settings?.isFavorite === true;
 
     const isEnabled = () => isPluginEnabled(plugin.name);
 
+    function togglePinned(e: React.MouseEvent) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!settings) return;
+        settings.isFavorite = !settings.isFavorite;
+    }
+
     function toggleEnabled() {
+        if (!settings) return;
         const wasEnabled = isEnabled();
 
         // If we're enabling a plugin, make sure all deps are enabled recursively.
@@ -48,8 +70,9 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
             }
         }
 
-        // if the plugin requires a restart, don't use stopPlugin/startPlugin. Wait for restart to apply changes.
+        // Patches still need a restart. Everything the plugin is running stops now.
         if (pluginRequiresRestart(plugin)) {
+            if (wasEnabled && plugin.started) stopPlugin(plugin);
             settings.enabled = !wasEnabled;
             onRestartNeeded(plugin.name, "enabled");
             return;
@@ -81,23 +104,40 @@ export function PluginCard({ plugin, disabled, onRestartNeeded, onMouseEnter, on
         <AddonCard
             name={plugin.name}
             description={plugin.description}
-            isNew={isNew}
+            badge={plugin.tags?.includes("API Required") ? { text: "API Required", color: "#5865F2" } : undefined}
+            className={pinned ? "vc-plugin-pinned" : "vc-plugin-unpinned"}
             enabled={isEnabled()}
             setEnabled={toggleEnabled}
             disabled={disabled}
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
             infoButton={
-                <button
-                    role="switch"
-                    onClick={() => openPluginModal(plugin, onRestartNeeded)}
-                    className={cl("info-button")}
-                >
-                    {hasAnyVisibleSettings(plugin)
-                        ? <CogWheel className={cl("info-icon")} />
-                        : <InfoIcon className={cl("info-icon")} />
-                    }
-                </button>
+                <>
+                    <button
+                        type="button"
+                        className="vc-plugin-pin"
+                        aria-label={pinned ? "Unpin plugin" : "Pin plugin"}
+                        aria-pressed={pinned}
+                        onClick={togglePinned}
+                    >
+                        <PinIcon filled={pinned} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={e => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openPluginModal(plugin, onRestartNeeded);
+                        }}
+                        className={cl("info-button")}
+                        aria-label={hasAnyVisibleSettings(plugin) ? "Open plugin settings" : "Plugin info"}
+                    >
+                        {hasAnyVisibleSettings(plugin)
+                            ? <CogWheel className={cl("info-icon")} />
+                            : <InfoIcon className={cl("info-icon")} />
+                        }
+                    </button>
+                </>
             } />
     );
 }

@@ -203,7 +203,7 @@ sealed class InstallerForm : Form
     public InstallerForm()
     {
         AutoScaleMode = AutoScaleMode.Dpi;
-        Text = "Vencord";
+        Text = "Void Client";
         Font = new Font("Segoe UI", 10f);
         ClientSize = new Size(WindowWidth, CompactHeight);
         StartPosition = FormStartPosition.CenterScreen;
@@ -230,7 +230,7 @@ sealed class InstallerForm : Form
 
         var title = new Label
         {
-            Text = "Vencord",
+            Text = "Void Client",
             AutoSize = true,
             Font = new Font("Segoe UI Semibold", 18f),
             ForeColor = Color.White,
@@ -665,7 +665,7 @@ sealed class InstallerForm : Form
                 catch { /* optional local token copy */ }
             }
             SetProgress(10);
-            SetUi("Installing", "Closing Discord and syncing Vencord…", Accent);
+            SetUi("Installing", "Closing Discord and syncing Void Client…", Accent);
 
             var script = FindScriptBeside(_toolsDir)
                 ?? throw new FileNotFoundException("UpdateVencord.ps1 not found in tools folder.");
@@ -763,7 +763,7 @@ sealed class InstallerForm : Form
         else if (line.Contains("Cloning official", StringComparison.OrdinalIgnoreCase))
         {
             SetProgress(28);
-            SetUi("First-time setup", "Downloading official Vencord…", Accent);
+            SetUi("First-time setup", "Downloading Void Client…", Accent);
         }
         else if (Regex.IsMatch(line, @"Updating files:\s+(\d+)%"))
         {
@@ -775,12 +775,12 @@ sealed class InstallerForm : Form
                  line.Contains("Fetching upstream", StringComparison.OrdinalIgnoreCase))
         {
             SetProgress(48);
-            SetUi("Updating Vencord", "Pulling the latest official release…", Accent);
+            SetUi("Updating Void Client", "Pulling the latest release…", Accent);
         }
         else if (line.Contains("Pulling plugins", StringComparison.OrdinalIgnoreCase))
         {
             SetProgress(58);
-            SetUi("Delexo Plugins", "Overlaying your plugins…", Accent);
+            SetUi("Plugins", "Adding plugins…", Accent);
         }
         else if (line.Contains("Installing pnpm", StringComparison.OrdinalIgnoreCase))
         {
@@ -796,12 +796,12 @@ sealed class InstallerForm : Form
                  line.Contains("Building Vencord", StringComparison.OrdinalIgnoreCase))
         {
             SetProgress(80);
-            SetUi("Building", "Compiling Vencord…", Accent);
+            SetUi("Building", "Compiling Void Client…", Accent);
         }
         else if (line.Contains("Running installer", StringComparison.OrdinalIgnoreCase))
         {
             SetProgress(90);
-            SetUi("Patching Discord", "Applying Vencord to Discord…", Accent);
+            SetUi("Patching Discord", "Applying Void Client to Discord…", Accent);
         }
         else if (line.Contains("Starting Discord", StringComparison.OrdinalIgnoreCase))
         {
@@ -820,7 +820,7 @@ sealed class InstallerForm : Form
         try
         {
             var desktop = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            var shortcutPath = Path.Combine(desktop, "Vencord Installer.lnk");
+            var shortcutPath = Path.Combine(desktop, "Void Client Installer.lnk");
             var exe = Environment.ProcessPath;
             if (string.IsNullOrEmpty(exe) || !File.Exists(exe)) return;
 
@@ -848,7 +848,7 @@ sealed class InstallerForm : Form
             dynamic sc = ((dynamic)ws).CreateShortcut(shortcutPath);
             sc.TargetPath = stableExe;
             sc.WorkingDirectory = appDir;
-            sc.Description = "Install or update Vencord + Delexo Plugins";
+            sc.Description = "Install or update Void Client";
             sc.Save();
         }
         catch

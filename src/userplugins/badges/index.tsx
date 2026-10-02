@@ -550,7 +550,7 @@ function SettingsPanel() {
                 </Button>
             </div>
             <div className={cl("hint")}>
-                Client-side badges from <Link href={HELP_ARTICLE}>Profile Badges 101</Link>. Anyone with Vencord installed can see them. Changes show up in about a second while a profile is open.
+                Client-side badges from <Link href={HELP_ARTICLE}>Profile Badges 101</Link>. Anyone with Void Client installed can see them. Changes show up in about a second while a profile is open.
             </div>
 
             {SECTIONS.map(id => <Section key={id} id={id} />)}
@@ -560,7 +560,7 @@ function SettingsPanel() {
 
 export default definePlugin({
     name: "Badges",
-    description: "Toggle official Discord profile badges onto your profile. Anyone with Vencord installed can see them.",
+    description: "Toggle official Discord profile badges onto your profile. Anyone with Void Client installed can see them.",
     authors: [Delexo],
     tags: ["Appearance"],
     enabledByDefault: true,

@@ -1,0 +1,337 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Delexo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-ctr-bar {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.vc-ctr-split {
+    display: inline-flex;
+    align-items: stretch;
+    height: 32px;
+    overflow: hidden;
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--interactive-normal, #b5bac1) 10%, transparent);
+}
+
+.vc-ctr-split .vc-chatbar-button {
+    width: auto !important;
+    height: 32px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.vc-ctr-split .vc-chatbar-button > div {
+    width: auto !important;
+    min-width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    padding: 0 7px !important;
+    border-radius: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box;
+}
+
+.vc-ctr-split > .vc-chatbar-button:first-child {
+    position: relative;
+}
+
+.vc-ctr-split > .vc-chatbar-button:first-child::after {
+    content: "";
+    position: absolute;
+    top: 8px;
+    right: 0;
+    bottom: 8px;
+    width: 1px;
+    background: color-mix(in srgb, var(--interactive-normal, #b5bac1) 28%, transparent);
+    pointer-events: none;
+}
+
+.vc-ctr-split > .vc-chatbar-button:last-child > div {
+    min-width: 0 !important;
+    padding: 0 8px !important;
+}
+
+.vc-ctr-split .vc-chatbar-button > div > div {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 !important;
+}
+
+.vc-ctr-icon {
+    display: block;
+}
+
+.vc-ctr-lang {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.vc-ctr-icon.busy {
+    animation: vc-ctr-spin 0.8s linear infinite;
+}
+
+.vc-ctr-switch {
+    width: 28px;
+    height: 16px;
+    display: block;
+    position: relative;
+    border-radius: 99px;
+    background: var(--background-modifier-accent, rgba(255, 255, 255, 0.16));
+}
+
+.vc-ctr-switch.vc-ctr-on {
+    background: var(--status-positive-background, #23a559);
+}
+
+.vc-ctr-knob {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--white-500, #fff);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+    transition: transform 0.12s ease;
+}
+
+.vc-ctr-switch.vc-ctr-on .vc-ctr-knob {
+    transform: translateX(12px);
+}
+
+.vc-ctr-picker {
+    position: fixed;
+    z-index: 10000;
+    width: 280px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-surface-high, #111214));
+    box-shadow: var(--elevation-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    color: var(--text-default, #dbdee1);
+}
+
+.vc-ctr-title {
+    margin: 0 0 10px;
+    color: var(--header-primary, #f2f3f5);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.vc-ctr-quick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.vc-ctr-chip {
+    appearance: none;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    border-radius: 6px;
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.04));
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vc-ctr-chip:hover {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-selected, rgba(255, 255, 255, 0.08));
+}
+
+.vc-ctr-chip.vc-ctr-selected {
+    color: var(--white-500, #fff);
+    background: var(--brand-500, #5865f2);
+    border-color: transparent;
+}
+
+.vc-ctr-search {
+    width: 100%;
+    height: 34px;
+    margin-bottom: 8px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    background: var(--input-background, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    outline: none;
+}
+
+.vc-ctr-search:focus {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-ctr-search::placeholder {
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-ctr-list {
+    max-height: 240px;
+    overflow: auto;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.2)) transparent;
+}
+
+.vc-ctr-list::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.vc-ctr-list::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.vc-ctr-list::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.vc-ctr-list::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0;
+}
+
+.vc-ctr-list::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.18));
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    min-height: 32px;
+}
+
+.vc-ctr-list::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.28));
+}
+
+.vc-ctr-option {
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.vc-ctr-option:hover {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.06));
+    color: var(--interactive-hover, #fff);
+}
+
+.vc-ctr-option.vc-ctr-selected {
+    color: var(--white-500, #fff);
+    background: var(--background-modifier-selected, rgba(88, 101, 242, 0.24));
+}
+
+.vc-ctr-option-code {
+    color: var(--text-muted, #949ba4);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.vc-ctr-empty {
+    padding: 12px 8px;
+    color: var(--text-muted, #949ba4);
+    font-size: 13px;
+    text-align: center;
+}
+
+.vc-ctr-key {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.vc-ctr-key-title {
+    color: var(--header-primary, #f2f3f5);
+}
+
+.vc-ctr-key-desc {
+    color: var(--header-secondary, #b5bac1);
+}
+
+.vc-ctr-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-ctr-key-input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    background: var(--input-background, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-size: 16px;
+    font-family: var(--font-primary, inherit);
+    outline: none;
+}
+
+.vc-ctr-key-input:focus {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-ctr-key-input::placeholder {
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-ctr-key-eye {
+    appearance: none;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    border-radius: 8px;
+    background: var(--input-background, #1e1f22);
+    color: var(--interactive-normal, #b5bac1);
+    cursor: pointer;
+}
+
+.vc-ctr-key-eye:hover {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.08));
+}
+
+.vc-ctr-key-eye[aria-pressed="true"] {
+    color: var(--brand-400, #949cf7);
+}
+
+@keyframes vc-ctr-spin {
+    to { transform: rotate(360deg); }
+}

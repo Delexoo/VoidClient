@@ -86,7 +86,7 @@ function OpenIpaFolders() {
         <div className="vc-ipa-folder-btns">
             <Button size={Button.Sizes.SMALL} onClick={() => open("plugin")}>Plugin folder</Button>
             <Button size={Button.Sizes.SMALL} onClick={() => open("captures")}>Wireshark captures</Button>
-            <Button size={Button.Sizes.SMALL} onClick={() => open("settings")}>Vencord settings</Button>
+            <Button size={Button.Sizes.SMALL} onClick={() => open("settings")}>Void Client settings</Button>
             <Button size={Button.Sizes.SMALL} onClick={() => open("log")}>Bridge log folder</Button>
             <Button size={Button.Sizes.SMALL} onClick={() => open("appDataDist")}>AppData dist</Button>
             <Button size={Button.Sizes.SMALL} onClick={() => open("delexooDist")}>Delexoo dist</Button>

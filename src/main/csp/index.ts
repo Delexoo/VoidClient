@@ -60,12 +60,8 @@ export const CspPolicies: PolicyMap = {
     "archive.org": ConnectSrc,
     "*.archive.org": ConnectSrc,
     "translate-pa.googleapis.com": ConnectSrc, // Google Translate API
-    "openrouter.ai": ConnectSrc, // LiveVoiceTranslate (API) OpenRouter speech
+    "openrouter.ai": ConnectSrc, // OpenRouter API
     "*.openrouter.ai": ConnectSrc,
-    "huggingface.co": ImageScriptsAndCssSrc, // LiveVoiceTranslate Whisper models
-    "*.huggingface.co": ImageScriptsAndCssSrc,
-    "*.hf.co": ImageScriptsAndCssSrc,
-    "*.xethub.hf.co": ImageScriptsAndCssSrc,
     "www.edigitalagency.com.au": ImageSrc, // ARP OnlyFans preset art
     "static.wikia.nocookie.net": ImageSrc, // ARP Camera preset art
     "static-prod.logosoftwear.com": ImageSrc, // ARP Harvard Online preset art

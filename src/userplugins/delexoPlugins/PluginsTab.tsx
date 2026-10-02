@@ -4,77 +4,37 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import * as DataStore from "@api/DataStore";
 import { isPluginEnabled } from "@api/PluginManager";
 import { useSettings } from "@api/Settings";
 import { Card } from "@components/Card";
 import { Divider } from "@components/Divider";
 import ErrorBoundary from "@components/ErrorBoundary";
 import { HeadingTertiary } from "@components/Heading";
-import { Heart } from "@components/Heart";
 import { Paragraph } from "@components/Paragraph";
 import { SettingsTab, wrapTab } from "@components/settings/tabs/BaseTab";
 import { cl } from "@components/settings/tabs/plugins";
+import { OpenRouterKeyCard } from "@components/settings/tabs/plugins/OpenRouterKeyCard";
 import { PluginCard } from "@components/settings/tabs/plugins/PluginCard";
 import { UIElementsButton } from "@components/settings/tabs/plugins/UIElements";
 import { ChangeList } from "@utils/ChangeList";
-import { openContributorModal } from "@components/settings/tabs/plugins/ContributorModal";
 import { isTruthy } from "@utils/guards";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { PluginTarget } from "@utils/pluginTargets";
-import { useAwaiter, useCleanupEffect } from "@utils/react";
+import { useCleanupEffect } from "@utils/react";
 import { PluginTag, PluginTags } from "@utils/types";
-import { Button, Clickable, ConfirmModal, IconUtils, lodash, openModal, Parser, React, SearchableSelect, Select, TextInput, Tooltip, useEffect, useMemo, useRef, useState, UserStore, UserUtils, useStateFromStores } from "@webpack/common";
+import { ConfirmModal, openModal, Parser, React, SearchableSelect, Select, TextInput, Tooltip, useMemo, useRef, useState } from "@webpack/common";
 import { JSX } from "react";
 
 import Plugins, { ExcludedPlugins, PluginMeta } from "~plugins";
-
-import { DELEXO_DISCORD_ID } from "../_delexo/author";
 
 const enum SearchStatus {
     ALL,
     FAVORITES,
     ENABLED,
     DISABLED,
-    NEW,
     USER_PLUGINS,
     API_PLUGINS
-}
-
-const DELEXO_USER_ID = String(DELEXO_DISCORD_ID);
-const SUPPORT_URL = "https://buy.stripe.com/9B63cu3RE2ouaKgcHLcjS00";
-
-function DelexoNameLink() {
-    const user = useStateFromStores([UserStore], () => UserStore.getUser(DELEXO_USER_ID));
-
-    useEffect(() => {
-        if (!user) void UserUtils.getUser(DELEXO_USER_ID).catch(() => undefined);
-    }, [user]);
-
-    const avatar = user
-        ? user.getAvatarURL(void 0, 40, true)
-        : IconUtils.getDefaultAvatarURL(DELEXO_USER_ID);
-
-    return (
-        <Clickable
-            tag="span"
-            className="vc-delexo-plugins-author"
-            onClick={() => {
-                if (user) {
-                    openContributorModal(user);
-                    return;
-                }
-                void UserUtils.getUser(DELEXO_USER_ID)
-                    .then(fetched => { if (fetched) openContributorModal(fetched); })
-                    .catch(() => undefined);
-            }}
-            aria-label="Open Delexo's Discord profile"
-        >
-            <img className="vc-delexo-plugins-pfp" src={avatar} alt="" />
-            Delexo
-        </Clickable>
-    );
 }
 
 function ReloadRequiredCard({ required }: { required: boolean; }) {
@@ -87,9 +47,13 @@ function ReloadRequiredCard({ required }: { required: boolean; }) {
                         <Paragraph className={cl("dep-text")}>
                             Restart now to apply new plugins and their settings
                         </Paragraph>
-                        <Button onClick={() => location.reload()} className={cl("restart-button")}>
+                        <button
+                            type="button"
+                            onClick={() => location.reload()}
+                            className={cl("restart-button")}
+                        >
                             Restart
-                        </Button>
+                        </button>
                     </>
                 )
                 : (
@@ -114,8 +78,8 @@ function ExcludedPluginsList({ search }: { search: string; }) {
         discordDesktop: "Discord Desktop app",
         vesktop: "Vesktop app",
         web: "Vesktop app and the Web version of Discord",
-        browser: "Web Browser version of Vencord",
-        dev: "Developer version of Vencord"
+        browser: "Web Browser version of Void Client",
+        dev: "Developer version of Void Client"
     };
 
     return (
@@ -135,11 +99,6 @@ function ExcludedPluginsList({ search }: { search: string; }) {
             }
         </Paragraph>
     );
-}
-
-function isDelexoPlugin(name: string) {
-    if (PluginMeta[name]?.userPlugin === true) return true;
-    return Plugins[name]?.authors?.some(a => a.id === DELEXO_DISCORD_ID) === true;
 }
 
 function makeDependencyList(deps: string[]) {
@@ -222,9 +181,6 @@ function DelexoPluginsTab() {
             case SearchStatus.ENABLED:
                 if (!isPluginEnabled(plugin.name)) return false;
                 break;
-            case SearchStatus.NEW:
-                if (!newPlugins?.includes(plugin.name)) return false;
-                break;
             case SearchStatus.USER_PLUGINS:
                 if (!PluginMeta[plugin.name]?.userPlugin) return false;
                 break;
@@ -249,24 +205,7 @@ function DelexoPluginsTab() {
         );
     };
 
-    const [newPlugins] = useAwaiter(() => DataStore.get("Vencord_existingPlugins").then((cachedPlugins: Record<string, number> | undefined) => {
-        const now = Date.now() / 1000;
-        const existingTimestamps: Record<string, number> = {};
-        const sortedPluginNames = Object.values(sortedPlugins).map(plugin => plugin.name);
-
-        const foundNew: string[] = [];
-        for (const { name: p } of sortedPlugins) {
-            const time = existingTimestamps[p] = cachedPlugins?.[p] ?? now;
-            if ((time + 60 * 60 * 24 * 2) > now) {
-                foundNew.push(p);
-            }
-        }
-        DataStore.set("Vencord_existingPlugins", existingTimestamps);
-
-        return lodash.isEqual(foundNew, sortedPluginNames) ? [] : foundNew;
-    }));
-
-    const delexoPlugins = [] as JSX.Element[];
+    const pinnedPlugins = [] as JSX.Element[];
     const stockPlugins = [] as JSX.Element[];
     const requiredPlugins = [] as JSX.Element[];
 
@@ -277,12 +216,12 @@ function DelexoPluginsTab() {
 
         if (!pluginFilter(p)) continue;
 
-        const isRequired = p.required || p.isDependency || depMap[p.name]?.some(d => settings.plugins[d].enabled);
+        const isRequired = p.required || p.isDependency || depMap[p.name]?.some(d => settings.plugins[d]?.enabled);
 
         if (isRequired) {
             const tooltipText = p.required || !depMap[p.name]
-                ? "This plugin is required for Vencord to function."
-                : makeDependencyList(depMap[p.name]?.filter(d => settings.plugins[d].enabled));
+                ? "This plugin is required for Void Client to function."
+                : makeDependencyList(depMap[p.name]?.filter(d => settings.plugins[d]?.enabled));
 
             requiredPlugins.push(
                 <Tooltip text={tooltipText} key={p.name}>
@@ -298,36 +237,40 @@ function DelexoPluginsTab() {
                     )}
                 </Tooltip>
             );
-        } else if (isDelexoPlugin(p.name)) {
-            delexoPlugins.push(
-                <PluginCard
-                    onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
-                    disabled={false}
-                    plugin={p}
-                    isNew={newPlugins?.includes(p.name)}
-                    key={p.name}
-                />
+        } else if (settings.plugins[p.name]?.isFavorite) {
+            pinnedPlugins.push(
+                <ErrorBoundary noop key={p.name}>
+                    <PluginCard
+                        onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
+                        disabled={false}
+                        plugin={p}
+                    />
+                </ErrorBoundary>
             );
         } else {
             stockPlugins.push(
-                <PluginCard
-                    onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
-                    disabled={false}
-                    plugin={p}
-                    isNew={newPlugins?.includes(p.name)}
-                    key={p.name}
-                />
+                <ErrorBoundary noop key={p.name}>
+                    <PluginCard
+                        onRestartNeeded={(name, key) => changes.handleChange(`${name}.${key}`)}
+                        disabled={false}
+                        plugin={p}
+                    />
+                </ErrorBoundary>
             );
         }
     }
 
-    const anyCards = delexoPlugins.length || stockPlugins.length || requiredPlugins.length;
+    const anyCards = pinnedPlugins.length || stockPlugins.length || requiredPlugins.length;
 
     return (
         <SettingsTab>
+            <OpenRouterKeyCard />
+
             <ReloadRequiredCard required={changes.hasChanges} />
 
-            <UIElementsButton />
+            <ErrorBoundary noop>
+                <UIElementsButton />
+            </ErrorBoundary>
 
             <HeadingTertiary className={classes(Margins.top20, Margins.bottom8)}>
                 Filters
@@ -339,7 +282,6 @@ function DelexoPluginsTab() {
                     placeholder="Search for a plugin..."
                     value={searchValue.value}
                     onChange={onSearch}
-                    autoFocus
                 />
             </ErrorBoundary>
 
@@ -351,7 +293,6 @@ function DelexoPluginsTab() {
                             { label: "Show Favorites", value: SearchStatus.FAVORITES },
                             { label: "Show Enabled", value: SearchStatus.ENABLED },
                             { label: "Show Disabled", value: SearchStatus.DISABLED },
-                            { label: "Show New", value: SearchStatus.NEW },
                             hasUserPlugins && { label: "Show UserPlugins", value: SearchStatus.USER_PLUGINS },
                             { label: "Show API Plugins", value: SearchStatus.API_PLUGINS },
                         ].filter(isTruthy)}
@@ -372,31 +313,17 @@ function DelexoPluginsTab() {
                 </div>
             </ErrorBoundary>
 
-            {delexoPlugins.length > 0 && (
-                <>
-                    <div className="vc-delexo-plugins-head">
-                        <div className="vc-delexo-plugins-head-text">
-                            <HeadingTertiary className="vc-delexo-plugins-heading">
-                                <DelexoNameLink /> Plugins
-                            </HeadingTertiary>
-                            <Paragraph className="vc-delexo-plugins-hint">
-                                Extended plugins for this Vencord build.
-                            </Paragraph>
-                        </div>
-                        <Button
-                            className="vc-delexo-plugins-support"
-                            size={Button.Sizes.SMALL}
-                            onClick={() => VencordNative.native.openExternal(SUPPORT_URL)}
-                        >
-                            Support Delexo
-                            <Heart className="vc-delexo-plugins-heart" />
-                        </Button>
-                    </div>
-                    <div className={cl("grid")}>
-                        {delexoPlugins}
-                    </div>
-                </>
-            )}
+            <ErrorBoundary noop>
+                <HeadingTertiary className={classes(Margins.top20, Margins.bottom8)}>
+                    Pinned
+                </HeadingTertiary>
+                <div className={cl("grid")}>
+                    {pinnedPlugins.length
+                        ? pinnedPlugins
+                        : <Paragraph>No plugins pinned.</Paragraph>
+                    }
+                </div>
+            </ErrorBoundary>
 
             <HeadingTertiary className={classes(Margins.top20, "vc-delexo-plugins-stock-heading")}>Plugins</HeadingTertiary>
 

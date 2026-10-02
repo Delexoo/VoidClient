@@ -79,7 +79,7 @@ function PluginTags({ tags }: { tags: PluginTag[]; }) {
 }
 
 export default function PluginModal({ plugin, onRestartNeeded, onClose, transitionState }: PluginModalProps) {
-    const pluginSettings = useSettings([`plugins.${plugin.name}.*`]).plugins[plugin.name];
+    const pluginSettings = useSettings([`plugins.${plugin.name}.*`]).plugins[plugin.name] ?? {};
     const hasSettings = hasAnyVisibleSettings(plugin);
 
     // avoid layout shift by showing dummy users while loading users
@@ -174,7 +174,7 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
             title={
                 <div className={cl("header")}>
                     <BaseText tag="h1" weight="semibold" size="lg">{plugin.name}</BaseText>
-                    {!pluginMeta.userPlugin && (
+                    {pluginMeta && !pluginMeta.userPlugin && (
                         <div className="vc-settings-modal-links">
                             <FavoriteButton
                                 isFavorite={pluginSettings.isFavorite ?? false}

@@ -20,7 +20,7 @@ import { openNotificationLogModal } from "@api/Notifications/notificationLog";
 import { useSettings } from "@api/Settings";
 import { Divider } from "@components/Divider";
 import { FormSwitch } from "@components/FormSwitch";
-import { FolderIcon, GithubIcon, LogIcon, PaintbrushIcon, RestartIcon } from "@components/Icons";
+import { FolderIcon, GithubIcon, LogIcon, PaintbrushIcon, RestartIcon, UninstallIcon } from "@components/Icons";
 import { QuickAction, QuickActionCard } from "@components/settings/QuickAction";
 import { SpecialCard } from "@components/settings/SpecialCard";
 import { SettingsTab, wrapTab } from "@components/settings/tabs/BaseTab";
@@ -32,7 +32,7 @@ import { IS_WINDOWS } from "@utils/constants";
 import { Margins } from "@utils/margins";
 import { isPluginDev } from "@utils/misc";
 import { relaunch } from "@utils/native";
-import { ConfirmModal, Forms, openModal, React, useMemo, UserStore } from "@webpack/common";
+import { ConfirmModal, Forms, openModal, showToast, Toasts, React, useMemo, UserStore } from "@webpack/common";
 
 import { DonateButtonComponent, isDonor } from "./DonateButton";
 import { MacOSVibrancySettings } from "./MacVibrancySettings";
@@ -134,6 +134,100 @@ function Switches() {
     });
 }
 
+function PerformanceSwitches() {
+    const settings = useSettings([
+        "lightweightUi",
+        "disableSmoothScroll",
+        "hardwareAcceleration",
+        "hardwareVideoAcceleration",
+        "staticTitle",
+        "windowShadow",
+        "roundedCorners"
+    ]);
+
+    const options = [
+        {
+            key: "lightweightUi",
+            title: "Lightweight interface",
+            description: "Animations stay off. This switch hides the gift and Shop buttons."
+        },
+        {
+            key: "disableSmoothScroll",
+            title: "Disable smooth scrolling",
+            description: "The chat list jumps to new messages instead of gliding. Takes effect after a restart.",
+            restartRequired: true
+        },
+        !IS_WEB && {
+            key: "hardwareAcceleration",
+            title: "Hardware acceleration",
+            description: "Leave this on. Turn it off only if the window flickers or the GPU stays busy. Takes effect after a restart.",
+            restartRequired: true
+        },
+        !IS_WEB && {
+            key: "hardwareVideoAcceleration",
+            title: "Video hardware acceleration",
+            description: "Uses the GPU for video and screenshare. Turn off if streams sit on a loading spinner. Takes effect after a restart.",
+            restartRequired: true
+        },
+        IS_DISCORD_DESKTOP && {
+            key: "staticTitle",
+            title: "Static window title",
+            description: "The window and taskbar say Void Client instead of the current channel. Takes effect after a restart.",
+            restartRequired: true
+        },
+        IS_DISCORD_DESKTOP && {
+            key: "windowShadow",
+            title: "Window shadow",
+            description: "Draws a shadow around the window. Takes effect after a restart.",
+            restartRequired: true
+        },
+        IS_DISCORD_DESKTOP && IS_WINDOWS && {
+            key: "roundedCorners",
+            title: "Rounded corners",
+            description: "Rounds the window corners. Takes effect after a restart.",
+            restartRequired: true
+        }
+    ] satisfies Array<false | {
+        key: KeysOfType<typeof settings, boolean>;
+        title: string;
+        description: string;
+        restartRequired?: boolean;
+    }>;
+
+    return options.map(setting => {
+        if (!setting) return null;
+
+        const { key, title, description, restartRequired } = setting;
+
+        return (
+            <FormSwitch
+                key={key}
+                title={title}
+                description={description}
+                value={settings[key]}
+                hideBorder
+                onChange={v => {
+                    settings[key] = v;
+
+                    if (restartRequired) {
+                        openModal(props => (
+                            <ConfirmModal
+                                {...props}
+                                title="Restart Required"
+                                subtitle="A restart is required to apply this change"
+                                confirmText="Restart now"
+                                cancelText="Later!"
+                                variant="primary"
+                                onConfirm={relaunch}
+                            />
+                        ));
+                    }
+                }}
+            />
+        );
+    });
+}
+
 function VencordSettings() {
     const donateImage = useMemo(() =>
         Math.random() > 0.5 ? DEFAULT_DONATE_IMAGE : SHIGGY_DONATE_IMAGE,
@@ -160,7 +254,7 @@ function VencordSettings() {
                 : (
                     <SpecialCard
                         title="Support the Project"
-                        description="Please consider supporting the development of Vencord by donating!"
+                        description="Please consider supporting the development of Void Client by donating!"
                         cardImage={donateImage}
                         backgroundImage={DONOR_BACKGROUND_IMAGE}
                         backgroundColor="#c3a3ce"
@@ -174,7 +268,7 @@ function VencordSettings() {
                 <SpecialCard
                     title="Contributions"
                     subtitle="Thank you for contributing!"
-                    description="Since you've contributed to Vencord you now have a cool new badge!"
+                    description="Since you've contributed to Void Client you now have a cool new badge!"
                     cardImage={COZY_CONTRIB_IMAGE}
                     backgroundImage={CONTRIB_BACKGROUND_IMAGE}
                     backgroundColor="#EDCC87"
@@ -216,6 +310,27 @@ function VencordSettings() {
                         text="View Source Code"
                         action={() => VencordNative.native.openExternal("https://github.com/" + gitRemote)}
                     />
+                    {IS_DISCORD_DESKTOP && (
+                        <QuickAction
+                            Icon={UninstallIcon}
+                            text="Uninstall"
+                            className="vc-uninstall"
+                            action={() => openModal(props => (
+                                <ConfirmModal
+                                    {...props}
+                                    title="Uninstall Void Client"
+                                    subtitle="A progress window will remove Void Client, then normal Discord opens on its own."
+                                    confirmText="Uninstall"
+                                    cancelText="Cancel"
+                                    onConfirm={() => {
+                                        VencordNative.native.uninstall().catch(err => {
+                                            showToast(String(err?.message || err || "Couldn't restore Discord."), Toasts.Type.FAILURE);
+                                        });
+                                    }}
+                                />
+                            ))}
+                        />
+                    )}
                 </QuickActionCard>
             </section>
 
@@ -236,6 +351,14 @@ function VencordSettings() {
             </section>
 
 
+            <section className={Margins.top16}>
+                <Forms.FormTitle tag="h5">Performance</Forms.FormTitle>
+                <Forms.FormText className={Margins.bottom20} style={{ color: "var(--text-muted)" }}>
+                    Animations, animated images, smooth scrolling, the spellchecker, and the spare background process stay off. GPU acceleration stays on.
+                </Forms.FormText>
+                <PerformanceSwitches />
+            </section>
+
             <MacOSVibrancySettings />
             <WindowsMaterialSettings />
 
@@ -244,4 +367,4 @@ function VencordSettings() {
     );
 }
 
-export default wrapTab(VencordSettings, "Vencord Settings");
+export default wrapTab(VencordSettings, "Void Client");

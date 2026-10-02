@@ -19,6 +19,7 @@
 import "./updater";
 import "./ipcPlugins";
 import "./settings";
+import { scheduleReturnToDiscord } from "./uninstall";
 
 import { debounce } from "@shared/debounce";
 import { IpcEvents } from "@shared/IpcEvents";
@@ -106,6 +107,7 @@ ipcMain.handle(IpcEvents.GET_THEME_SYSTEM_VALUES, () => {
 
 ipcMain.handle(IpcEvents.OPEN_THEMES_FOLDER, () => shell.openPath(THEMES_DIR));
 ipcMain.handle(IpcEvents.OPEN_SETTINGS_FOLDER, () => shell.openPath(SETTINGS_DIR));
+ipcMain.handle(IpcEvents.UNINSTALL, () => scheduleReturnToDiscord());
 
 let fsWatchers = [] as FSWatcher[];
 
@@ -147,7 +149,7 @@ ipcMain.on(IpcEvents.GET_MONACO_THEME, e => {
 });
 
 ipcMain.handle(IpcEvents.OPEN_MONACO_EDITOR, async () => {
-    const title = "Vencord QuickCSS Editor";
+    const title = "Void Client QuickCSS Editor";
     const existingWindow = BrowserWindow.getAllWindows().find(w => w.title === title);
     if (existingWindow && !existingWindow.isDestroyed()) {
         existingWindow.focus();

@@ -1,3 +1,13 @@
+[id^="chat-messages-"].vc-trans-tinted,
+[id^="chat-messages-"].vc-trans-tinted:hover {
+    background-color: rgba(128, 132, 142, 0.35);
+    border-radius: 4px;
+}
+
+[id^="chat-messages-"].vc-trans-tinted [id^="message-content-"] {
+    color: var(--text-muted);
+}
+
 .vc-trans-accessory {
     color: var(--text-muted);
     margin-top: 0.5em;

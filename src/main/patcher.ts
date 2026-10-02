@@ -23,7 +23,7 @@ import { dirname, join } from "path";
 import { RendererSettings } from "./settings";
 import { IS_VANILLA } from "./utils/constants";
 
-console.log("[Vencord] Starting up...");
+console.log("[Void Client] Starting up...");
 
 // Our injector file at app/index.js
 const injectorPath = require.main!.filename;
@@ -46,6 +46,18 @@ if (!IS_VANILLA) {
     // Repatch after host updates on Windows and Linux
     if (process.platform === "win32" || process.platform === "linux") {
         require("./persistAfterDiscordUpdates");
+    }
+
+    // Missing keys keep the defaults: GPU on, smooth scroll off, title stays "Void Client".
+    if (settings.hardwareAcceleration === false) {
+        app.disableHardwareAcceleration();
+    }
+    if (settings.hardwareVideoAcceleration === false) {
+        app.commandLine.appendSwitch("disable-accelerated-video-decode");
+        app.commandLine.appendSwitch("disable-accelerated-video-encode");
+    }
+    if (settings.disableSmoothScroll !== false) {
+        app.commandLine.appendSwitch("disable-smooth-scrolling");
     }
 
     if (process.platform === "win32" && settings.winCtrlQ) {
@@ -79,6 +91,7 @@ if (!IS_VANILLA) {
             const original = options.webPreferences.preload;
             options.webPreferences.preload = join(__dirname, "preload.js");
             options.webPreferences.sandbox = false;
+            options.webPreferences.spellcheck = false;
             // work around discord unloading when in background
             options.webPreferences.backgroundThrottling = false;
 
@@ -106,6 +119,13 @@ if (!IS_VANILLA) {
                 options.backgroundColor = "#00000000";
             }
 
+            if (settings.windowShadow === false) {
+                options.hasShadow = false;
+            }
+            if (settings.roundedCorners === false) {
+                options.roundedCorners = false;
+            }
+
             process.env.DISCORD_PRELOAD = original;
 
             super(options);
@@ -114,6 +134,15 @@ if (!IS_VANILLA) {
                 // Disable the Electron call entirely so that Discord can't dynamically change the size
                 this.setMinimumSize = (_width: number, _height: number) => { };
             }
+
+            if (settings.staticTitle !== false) {
+                this.setTitle("Void Client");
+                this.on("page-title-updated", event => event.preventDefault());
+            }
+
+            try {
+                this.webContents.session.setSpellCheckerEnabled(false);
+            } catch { }
         }
     }
     Object.assign(BrowserWindow, electron.BrowserWindow);
@@ -130,24 +159,48 @@ if (!IS_VANILLA) {
         BrowserWindow
     };
 
-    // Patch appSettings to force enable devtools
+    // Patch appSettings to force enable devtools and keep the game overlay from starting its own process.
     onceDefined(global, "appSettings", s => {
         s.set("DANGEROUS_ENABLE_DEVTOOLS_ONLY_ENABLE_IF_YOU_KNOW_WHAT_YOURE_DOING", true);
+        s.set("enableOverlay", false);
     });
 
     process.env.DATA_DIR = join(app.getPath("userData"), "..", "Vencord");
 
-    // Monkey patch commandLine to:
-    // - disable UseEcoQoSForBackgroundProcess: Work around Discord unloading when in background
+    // Features Discord does not need to draw chat. Kept even if Discord appends its own disable-features list later.
+    const lightweightDisabledFeatures = [
+        "UseEcoQoSForBackgroundProcess",
+        "SpareRendererForSitePerProcess",
+        "BackForwardCache",
+        "HardwareMediaKeyHandling",
+        "MediaSessionService",
+        "Translate",
+        "TranslateUI",
+        "OptimizationHints",
+        "GlobalMediaControls",
+        "InterestFeedContentSuggestions"
+    ];
+
     const originalAppend = app.commandLine.appendSwitch;
     app.commandLine.appendSwitch = function (...args) {
         if (args[0] === "disable-features") {
-            const disabledFeatures = new Set((args[1] ?? "").split(","));
-            disabledFeatures.add("UseEcoQoSForBackgroundProcess");
-            args[1] += [...disabledFeatures].join(",");
+            const disabledFeatures = new Set((args[1] ?? "").split(",").filter(Boolean));
+            for (const feature of lightweightDisabledFeatures) disabledFeatures.add(feature);
+            args[1] = [...disabledFeatures].join(",");
+        }
+        if (args[0] === "blink-settings") {
+            const blink = new Set((args[1] ?? "").split(",").filter(Boolean));
+            blink.add("imageAnimationPolicy=none");
+            args[1] = [...blink].join(",");
         }
         return originalAppend.apply(this, args);
     };
+
+    app.commandLine.appendSwitch("disable-features", lightweightDisabledFeatures.join(","));
+    app.commandLine.appendSwitch("blink-settings", "imageAnimationPolicy=none");
+    app.commandLine.appendSwitch("force-prefers-reduced-motion");
+    app.commandLine.appendSwitch("disable-breakpad");
+    app.commandLine.appendSwitch("disable-smooth-scrolling");
 
     // disable renderer backgrounding to prevent the app from unloading when in the background
     // https://github.com/electron/electron/issues/2822
@@ -158,8 +211,8 @@ if (!IS_VANILLA) {
     app.commandLine.appendSwitch("disable-background-timer-throttling");
     app.commandLine.appendSwitch("disable-backgrounding-occluded-windows");
 } else {
-    console.log("[Vencord] Running in vanilla mode. Not loading Vencord");
+    console.log("[Void Client] Running in vanilla mode. Not loading Void Client");
 }
 
-console.log("[Vencord] Loading original Discord app.asar");
+console.log("[Void Client] Loading original Discord app.asar");
 require(require.main!.filename);

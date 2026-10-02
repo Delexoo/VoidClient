@@ -17,14 +17,15 @@ export interface QuickActionProps {
     text: ReactNode;
     action?: () => void;
     disabled?: boolean;
+    className?: string;
     style?: React.CSSProperties;
 }
 
 export function QuickAction(props: QuickActionProps) {
-    const { Icon, action, text, disabled, style } = props;
+    const { Icon, action, text, disabled, className, style } = props;
 
     return (
-        <button className={cl("pill")} onClick={action} disabled={disabled} style={style}>
+        <button className={cl("pill") + (className ? " " + className : "")} onClick={action} disabled={disabled} style={style}>
             <Icon className={cl("img")} />
             {text}
         </button>

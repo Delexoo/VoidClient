@@ -1,0 +1,478 @@
+/*
+ * Vencord, a Discord client mod
+ * Copyright (c) 2026 Delexo contributors
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
+.vc-qsum-root {
+    position: fixed;
+    z-index: 10000;
+    width: 372px;
+    max-width: calc(100vw - 24px);
+    pointer-events: none;
+    font-family: var(--font-primary, Whitney, "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif);
+}
+
+.vc-qsum-card {
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    max-height: min(440px, calc(100vh - 32px));
+    overflow: hidden;
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-surface-high, var(--background-secondary, #2b2d31)));
+    border: 1px solid var(--border-subtle, var(--background-modifier-accent, #3f4147));
+    box-shadow: var(--elevation-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    color: var(--text-default, var(--text-normal, #dbdee1));
+}
+
+.vc-qsum-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 10px 12px 14px;
+    background: var(--background-secondary, var(--background-base-low, #2b2d31));
+    border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    cursor: grab;
+    user-select: none;
+}
+
+.vc-qsum-head:active {
+    cursor: grabbing;
+}
+
+.vc-qsum-mark {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: var(--background-modifier-selected, rgba(255, 255, 255, 0.06));
+    color: var(--interactive-normal, #b5bac1);
+}
+
+.vc-qsum-titles {
+    min-width: 0;
+    flex: 1;
+}
+
+.vc-qsum-title {
+    color: var(--header-primary, #f2f3f5);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 20px;
+    letter-spacing: 0.01em;
+}
+
+.vc-qsum-meta {
+    color: var(--text-muted, #949ba4);
+    font-size: 12px;
+    line-height: 16px;
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.vc-qsum-actions {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.vc-qsum-iconbtn {
+    appearance: none;
+    width: 32px;
+    height: 32px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--interactive-normal, #b5bac1);
+    cursor: pointer;
+}
+
+.vc-qsum-iconbtn:hover {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.08));
+    color: var(--interactive-hover, #fff);
+}
+
+.vc-qsum-langbtn {
+    appearance: none;
+    min-width: 40px;
+    height: 32px;
+    padding: 0 8px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    border-radius: 4px;
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.06));
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.vc-qsum-langbtn:hover,
+.vc-qsum-langbtn[aria-expanded="true"] {
+    background: var(--background-modifier-selected, rgba(255, 255, 255, 0.1));
+    color: var(--interactive-hover, #fff);
+}
+
+.vc-qsum-picker {
+    position: fixed;
+    z-index: 10001;
+    width: 280px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--background-floating, var(--background-surface-high, #111214));
+    box-shadow: var(--elevation-high, 0 8px 16px rgba(0, 0, 0, 0.24));
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+    color: var(--text-default, #dbdee1);
+    font-family: var(--font-primary, Whitney, "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif);
+}
+
+.vc-qsum-picker-title {
+    margin: 0 0 10px;
+    color: var(--header-primary, #f2f3f5);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+
+.vc-qsum-quick {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.vc-qsum-chip {
+    appearance: none;
+    height: 32px;
+    padding: 0 8px;
+    border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+    border-radius: 6px;
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.04));
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.vc-qsum-chip-auto {
+    grid-column: 1 / -1;
+}
+
+.vc-qsum-chip:hover {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-selected, rgba(255, 255, 255, 0.08));
+}
+
+.vc-qsum-chip.vc-qsum-selected {
+    color: var(--white-500, #fff);
+    background: var(--brand-500, #5865f2);
+    border-color: transparent;
+}
+
+.vc-qsum-search {
+    width: 100%;
+    height: 34px;
+    margin-bottom: 8px;
+    padding: 0 10px;
+    border-radius: 6px;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    background: var(--input-background, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.vc-qsum-search:focus {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-qsum-search::placeholder {
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-qsum-list {
+    max-height: 220px;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.2)) transparent;
+}
+
+.vc-qsum-option {
+    appearance: none;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--interactive-normal, #b5bac1);
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.vc-qsum-option:hover {
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.06));
+    color: var(--interactive-hover, #fff);
+}
+
+.vc-qsum-option.vc-qsum-selected {
+    color: var(--white-500, #fff);
+    background: var(--background-modifier-selected, rgba(88, 101, 242, 0.24));
+}
+
+.vc-qsum-option-code {
+    color: var(--text-muted, #949ba4);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+.vc-qsum-empty {
+    padding: 12px 8px;
+    color: var(--text-muted, #949ba4);
+    font-size: 13px;
+    text-align: center;
+}
+
+.vc-qsum-body {
+    padding: 4px 0 10px;
+    min-height: 88px;
+    background: var(--background-secondary, var(--background-base-low, #2b2d31));
+}
+
+.vc-qsum-scroll {
+    max-height: 300px;
+    overflow: auto;
+    padding: 8px 8px 4px 14px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.2)) transparent;
+}
+
+.vc-qsum-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.vc-qsum-scroll::-webkit-scrollbar-button {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+}
+
+.vc-qsum-scroll::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.vc-qsum-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0;
+}
+
+.vc-qsum-scroll::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.18));
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    min-height: 32px;
+}
+
+.vc-qsum-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thin-thumb, hsl(0 0% 100% / 0.28));
+}
+
+.vc-qsum-content {
+    padding-right: 8px;
+}
+
+.vc-qsum-gist {
+    margin: 0 0 12px;
+    color: var(--header-secondary, #b5bac1);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.5;
+}
+
+.vc-qsum-points {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.vc-qsum-points li {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.vc-qsum-dot {
+    flex: 0 0 auto;
+    width: 6px;
+    height: 6px;
+    margin-top: 8px;
+    border-radius: 50%;
+    background: var(--interactive-normal, #b5bac1);
+    opacity: 0.7;
+}
+
+.vc-qsum-point {
+    min-width: 0;
+    color: var(--text-default, var(--text-normal, #dbdee1));
+    font-size: 15px;
+    line-height: 1.45;
+    word-break: break-word;
+}
+
+.vc-qsum-point strong {
+    color: var(--header-primary, #f2f3f5);
+    font-weight: 600;
+}
+
+button.vc-qsum-jump {
+    appearance: none;
+    display: block;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 4px;
+}
+
+button.vc-qsum-gist.vc-qsum-jump {
+    margin: 0 0 12px;
+    padding: 2px 4px 2px 0;
+}
+
+button.vc-qsum-point.vc-qsum-jump {
+    padding: 2px 4px 2px 0;
+}
+
+button.vc-qsum-jump:hover {
+    color: var(--header-primary, #f2f3f5);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.vc-qsum-points li:has(button.vc-qsum-jump):hover .vc-qsum-dot {
+    background: var(--brand-400, #949cf7);
+    opacity: 1;
+}
+
+.vc-qsum-status,
+.vc-qsum-error {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 88px;
+    padding: 12px 16px;
+    color: var(--text-muted, #949ba4);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.vc-qsum-error {
+    color: var(--text-danger, #f23f43);
+}
+
+.vc-qsum-spin {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--background-modifier-accent, rgba(255, 255, 255, 0.16));
+    border-top-color: var(--interactive-active, #fff);
+    animation: vc-qsum-spin 0.7s linear infinite;
+}
+
+.vc-qsum-key {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.vc-qsum-key-title {
+    color: var(--header-primary, #f2f3f5);
+}
+
+.vc-qsum-key-desc {
+    color: var(--header-secondary, #b5bac1);
+}
+
+.vc-qsum-key-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.vc-qsum-key-input {
+    flex: 1;
+    min-width: 0;
+    height: 40px;
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    background: var(--input-background, #1e1f22);
+    color: var(--text-default, #dbdee1);
+    font-size: 16px;
+    font-family: var(--font-primary, inherit);
+    outline: none;
+}
+
+.vc-qsum-key-input:focus {
+    border-color: var(--brand-500, #5865f2);
+}
+
+.vc-qsum-key-input::placeholder {
+    color: var(--text-muted, #949ba4);
+}
+
+.vc-qsum-key-eye {
+    appearance: none;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--input-border, rgba(255, 255, 255, 0.12));
+    border-radius: 8px;
+    background: var(--input-background, #1e1f22);
+    color: var(--interactive-normal, #b5bac1);
+    cursor: pointer;
+}
+
+.vc-qsum-key-eye:hover {
+    color: var(--interactive-hover, #fff);
+    background: var(--background-modifier-hover, rgba(255, 255, 255, 0.08));
+}
+
+.vc-qsum-key-eye[aria-pressed="true"] {
+    color: var(--brand-400, #949cf7);
+}
+
+@keyframes vc-qsum-spin {
+    to { transform: rotate(360deg); }
+}
