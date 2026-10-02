@@ -19,6 +19,7 @@
 import "./updater";
 import "./ipcPlugins";
 import "./settings";
+import { resetUserData } from "./resetUserData";
 import { scheduleReturnToDiscord } from "./uninstall";
 
 import { debounce } from "@shared/debounce";
@@ -108,6 +109,7 @@ ipcMain.handle(IpcEvents.GET_THEME_SYSTEM_VALUES, () => {
 ipcMain.handle(IpcEvents.OPEN_THEMES_FOLDER, () => shell.openPath(THEMES_DIR));
 ipcMain.handle(IpcEvents.OPEN_SETTINGS_FOLDER, () => shell.openPath(SETTINGS_DIR));
 ipcMain.handle(IpcEvents.UNINSTALL, () => scheduleReturnToDiscord());
+ipcMain.handle(IpcEvents.RESET_USER_DATA, () => resetUserData());
 
 let fsWatchers = [] as FSWatcher[];
 

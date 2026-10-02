@@ -39,18 +39,19 @@ Source: "scripts\Install-VoidClient.ps1"; DestDir: "{app}\installer"; Flags: ign
 Source: "scripts\Uninstall-VoidClient.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "scripts\Update-VoidClient.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "scripts\Open-VoidClient.ps1"; DestDir: "{app}\installer"; Flags: ignoreversion
+Source: "scripts\Run-Hidden.vbs"; DestDir: "{app}\installer"; Flags: ignoreversion
 Source: "version.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autodesktop}\Void Client"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\installer\Open-VoidClient.ps1"""; WorkingDir: "{app}"
-Name: "{autoprograms}\Void Client"; Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\installer\Open-VoidClient.ps1"""; WorkingDir: "{app}"
+Name: "{autodesktop}\Void Client"; Filename: "{sys}\wscript.exe"; Parameters: "//B //Nologo ""{app}\installer\Run-Hidden.vbs"" ""{app}\installer\Open-VoidClient.ps1"""; WorkingDir: "{app}"
+Name: "{autoprograms}\Void Client"; Filename: "{sys}\wscript.exe"; Parameters: "//B //Nologo ""{app}\installer\Run-Hidden.vbs"" ""{app}\installer\Open-VoidClient.ps1"""; WorkingDir: "{app}"
 
 [Run]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\installer\Install-VoidClient.ps1"" -InstallDir ""{app}"""; StatusMsg: "Installing Void Client into Discord..."; Flags: waituntilterminated
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File ""{app}\installer\Open-VoidClient.ps1"""; Description: "Open Discord with Void Client"; Flags: nowait postinstall skipifsilent
+Filename: "{sys}\wscript.exe"; Parameters: "//B //Nologo ""{app}\installer\Run-Hidden.vbs"" ""{app}\installer\Install-VoidClient.ps1"" -InstallDir ""{app}"""; StatusMsg: "Installing Void Client into Discord..."; Flags: waituntilterminated
+Filename: "{sys}\wscript.exe"; Parameters: "//B //Nologo ""{app}\installer\Run-Hidden.vbs"" ""{app}\installer\Open-VoidClient.ps1"""; Description: "Open Discord with Void Client"; Flags: nowait postinstall skipifsilent
 
 [UninstallRun]
-Filename: "powershell.exe"; Parameters: "-NoProfile -ExecutionPolicy Bypass -File ""{app}\installer\Uninstall-VoidClient.ps1"" -InstallDir ""{app}"""; Flags: waituntilterminated; RunOnceId: "RestoreDiscord"
+Filename: "{sys}\wscript.exe"; Parameters: "//B //Nologo ""{app}\installer\Run-Hidden.vbs"" ""{app}\installer\Uninstall-VoidClient.ps1"" -InstallDir ""{app}"""; Flags: waituntilterminated; RunOnceId: "RestoreDiscord"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{localappdata}\DelexooVencord"

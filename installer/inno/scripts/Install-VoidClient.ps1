@@ -129,7 +129,8 @@ $timer.Add_Tick({
 
         Set-Step $form 90 "Installing Void Client" "Turning on automatic updates."
         $updater = Join-Path $InstallDir "installer\Update-VoidClient.ps1"
-        $arg = "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$updater`" -InstallDir `"$InstallDir`""
+        $hidden = Join-Path $InstallDir "installer\Run-Hidden.vbs"
+        $arg = "wscript.exe //B //Nologo `"$hidden`" `"$updater`" -InstallDir `"$InstallDir`""
         New-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run" -Name "Void Client Updater" -Value $arg -PropertyType String -Force | Out-Null
 
         Set-Step $form 100 "Void Client is installed" ($done -join ", ")

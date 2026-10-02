@@ -81,6 +81,7 @@ export default {
         supportsWindowsMaterial: () => sendSync<boolean>(IpcEvents.SUPPORTS_WINDOWS_MATERIAL),
         openExternal: (url: string) => invoke<void>(IpcEvents.OPEN_EXTERNAL, url),
         uninstall: () => invoke<void>(IpcEvents.UNINSTALL),
+        resetUserData: () => invoke<void>(IpcEvents.RESET_USER_DATA),
         getRendererCss: () => invoke<string>(IpcEvents.GET_RENDERER_CSS),
         onRendererCssUpdate: (cb: (newCss: string) => void) => {
             if (!IS_DEV) return;

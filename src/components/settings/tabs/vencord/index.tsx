@@ -16,11 +16,12 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+import { clear as clearDataStore } from "@api/DataStore";
 import { openNotificationLogModal } from "@api/Notifications/notificationLog";
 import { useSettings } from "@api/Settings";
 import { Divider } from "@components/Divider";
 import { FormSwitch } from "@components/FormSwitch";
-import { FolderIcon, GithubIcon, LogIcon, PaintbrushIcon, RestartIcon, UninstallIcon } from "@components/Icons";
+import { FolderIcon, GithubIcon, LogIcon, PaintbrushIcon, ResetDataIcon, RestartIcon, UninstallIcon } from "@components/Icons";
 import { QuickAction, QuickActionCard } from "@components/settings/QuickAction";
 import { SpecialCard } from "@components/settings/SpecialCard";
 import { SettingsTab, wrapTab } from "@components/settings/tabs/BaseTab";
@@ -310,6 +311,28 @@ function VencordSettings() {
                         text="View Source Code"
                         action={() => VencordNative.native.openExternal("https://github.com/" + gitRemote)}
                     />
+                    {IS_DISCORD_DESKTOP && (
+                        <QuickAction
+                            Icon={ResetDataIcon}
+                            text="Reset data"
+                            action={() => openModal(props => (
+                                <ConfirmModal
+                                    {...props}
+                                    title="Reset user data"
+                                    subtitle="Saved settings, API keys, and plugin files are cleared. Void Client stays installed and the default plugins turn back on."
+                                    confirmText="Reset data"
+                                    cancelText="Cancel"
+                                    onConfirm={() => {
+                                        void clearDataStore()
+                                            .then(() => VencordNative.native.resetUserData())
+                                            .catch(err => {
+                                                showToast(String(err?.message || err || "Couldn't reset user data."), Toasts.Type.FAILURE);
+                                            });
+                                    }}
+                                />
+                            ))}
+                        />
+                    )}
                     {IS_DISCORD_DESKTOP && (
                         <QuickAction
                             Icon={UninstallIcon}

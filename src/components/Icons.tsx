@@ -381,6 +381,17 @@ export function LogIcon(props: IconProps) {
     );
 }
 
+export function ResetDataIcon(props: IconProps) {
+    return (
+        <Icon {...props} viewBox="0 0 24 24">
+            <path
+                fill="currentColor"
+                d="M12 3a9 9 0 1 0 8.48 12.01 1 1 0 1 0-1.88-.68A7 7 0 1 1 12 5h.17l-1.58 1.59a1 1 0 0 0 1.42 1.41l3.3-3.29a1 1 0 0 0 0-1.42l-3.3-3.3a1 1 0 0 0-1.42 1.42L12.17 3H12Z"
+            />
+        </Icon>
+    );
+}
+
 export function UninstallIcon(props: IconProps) {
     return (
         <Icon
