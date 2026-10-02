@@ -2,7 +2,7 @@
  * Plugins Void Client pins on first run, and the ones that start enabled.
  */
 
-export const VOID_CLIENT_DEFAULTS_VERSION = 1;
+export const VOID_CLIENT_DEFAULTS_VERSION = 2;
 
 export const VOID_CLIENT_PINNED = [
     "AdvancedNotes",
@@ -14,6 +14,7 @@ export const VOID_CLIENT_PINNED = [
     "Fake Defean",
     "ImageZoom",
     "Internet Protocol Assessment",
+    "LiveVoiceTranslate",
     "Mentions",
     "MessageLogger",
     "Nickname",
@@ -21,6 +22,7 @@ export const VOID_CLIENT_PINNED = [
     "PhishingDetect",
     "QuickSummary",
     "ReverseImageSearch",
+    "Spoof Join",
     "StalkerMode",
     "TranslateFromHere",
     "Translate",
