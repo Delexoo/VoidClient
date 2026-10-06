@@ -395,8 +395,8 @@ export function LiveProfilePreview() {
     return (
         <div className={cl("profile-preview")}>
             <div className={cl("profile-kicker")}>Profile</div>
-            <div className={cl("profile-popout")}>
-                <div className={cl("profile-banner")} style={bannerStyle(me?.id, profile)} />
+            <div className={cl("preview-card")}>
+                <div className={cl("cover")} style={bannerStyle(me?.id, profile)} />
                 <div className={cl("profile-body")}>
                     <div className={cl("profile-avatar-row")}>
                         {me && (

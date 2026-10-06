@@ -617,7 +617,9 @@ function RpcFields() {
 function pinLayout(root: HTMLDivElement) {
     const restored: Array<() => void> = [];
     const dialog = root.closest<HTMLElement>("[role='dialog']");
+    const host = root.closest<HTMLElement>(".vc-settings-modal-content");
     dialog?.classList.add("vc-arp-open");
+    host?.classList.add("vc-arp-host");
 
     const scrollers: HTMLElement[] = [];
     let node: HTMLElement | null = root.parentElement;
@@ -646,7 +648,7 @@ function pinLayout(root: HTMLDivElement) {
         root.style.maxHeight = `${height}px`;
     };
 
-    return { dialog, fit, restored };
+    return { dialog, host, fit, restored };
 }
 
 export function PresenceSettings() {
@@ -656,7 +658,7 @@ export function PresenceSettings() {
         const root = rootRef.current;
         if (!root) return;
 
-        const { dialog, fit, restored } = pinLayout(root);
+        const { dialog, host, fit, restored } = pinLayout(root);
         fit();
         const observer = new ResizeObserver(fit);
         observer.observe(root.parentElement ?? root);
@@ -671,6 +673,7 @@ export function PresenceSettings() {
             window.removeEventListener("resize", fit);
             observer.disconnect();
             dialog?.classList.remove("vc-arp-open");
+            host?.classList.remove("vc-arp-host");
             root.style.height = "";
             root.style.maxHeight = "";
             restored.forEach(undo => undo());

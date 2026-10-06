@@ -35,7 +35,7 @@ export async function transcribeOpenRouter(
 ): Promise<{ text: string; }> {
     const key = apiKey.trim();
     if (!key) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
-    if (samples.length < sampleRate * 0.7) return { text: "" };
+    if (samples.length < sampleRate * 0.4) return { text: "" };
     if (!Native?.transcribeOpenRouter)
         throw new Error("Restart Discord from the tray so OpenRouter can run.");
 

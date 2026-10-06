@@ -175,7 +175,7 @@ export async function transcribeOpenRouter(
         form.append("model", modelId);
         form.append("temperature", "0");
         form.append("response_format", "json");
-        form.append("prompt", "Transcribe only words that were spoken. Leave silence and noise blank.");
+        form.append("prompt", "Verbatim speech only. Do not invent words, filler, or captions from silence or noise.");
         if (lang && lang !== "auto") form.append("language", lang);
         form.append("file", new Blob([new Uint8Array(bytes)], { type: "audio/wav" }), "speech.wav");
         let parsed = await parseBody(await fetch("https://openrouter.ai/api/v1/audio/transcriptions", {
@@ -187,7 +187,7 @@ export async function transcribeOpenRouter(
             const payload: Record<string, unknown> = {
                 model: modelId,
                 temperature: 0,
-                prompt: "Transcribe only words that were spoken. Leave silence and noise blank.",
+                prompt: "Verbatim speech only. Do not invent words, filler, or captions from silence or noise.",
                 input_audio: { data: audioBase64, format: "wav" }
             };
             if (lang && lang !== "auto") payload.language = lang;

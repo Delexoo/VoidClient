@@ -9,6 +9,7 @@ import { getOpenRouterKey } from "@utils/openRouterKey";
 import { PluginNative } from "@utils/types";
 
 import { isJunkTranscript, normalizeLangCode, sameSpokenText } from "../_delexo/langNames";
+import { activeSpeakerName, localTalker, rankedSpeakers } from "../_delexo/ultraVoiceOverlay";
 import { STT_MODEL, transcribeOpenRouter } from "./openrouter";
 import { googleTranslate } from "./translate";
 
@@ -17,18 +18,18 @@ const Native = VencordNative.pluginHelpers.LiveVoiceTranslate as PluginNative<ty
 const HISTORY_KEY = "LiveVoiceTranslate2History";
 const MAX_HISTORY = 40;
 const TARGET_SR = 16000;
-const SPEECH_RMS = 0.006;
-const SYSTEM_SPEECH_RMS = 0.006;
-const SILENCE_MS = 1400;
-const MIN_SPEECH_MS = 900;
-const SYSTEM_MIN_SPEECH_MS = 900;
-const MAX_UTTER_MS = 12000;
-const PREROLL_CHUNKS = 8;
-const MIN_UTTER_RMS = 0.004;
-const SYSTEM_MIN_UTTER_RMS = 0.004;
-const MIN_UTTER_SEC = 1.2;
+const SPEECH_RMS = 0.0032;
+const SYSTEM_SPEECH_RMS = 0.0032;
+const SILENCE_MS = 1700;
+const MIN_SPEECH_MS = 420;
+const SYSTEM_MIN_SPEECH_MS = 420;
+const MAX_UTTER_MS = 14000;
+const PREROLL_CHUNKS = 14;
+const MIN_UTTER_RMS = 0.0016;
+const SYSTEM_MIN_UTTER_RMS = 0.0016;
+const MIN_UTTER_SEC = 0.5;
 
-export type HistoryRow = { original: string; translation: string; fromLang?: string; toLang?: string; };
+export type HistoryRow = { original: string; translation: string; fromLang?: string; toLang?: string; speaker?: string; };
 
 type PersistPayload = {
     history: HistoryRow[];
@@ -86,6 +87,21 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 let historyLoaded = false;
 let noiseRms = 0.003;
 let heardPeak = 0;
+const speakerVotes = new Map<string, number>();
+let lastSpeakerSample = 0;
+let utteranceId = "";
+let utteranceSpeaker = "";
+let seenId = "";
+let seenSince = 0;
+
+const SYSTEM_LABEL = "System audio";
+const SYSTEM_ID = "system";
+let recapturing = false;
+
+type UtterJob = { chunks: Float32Array[]; speaker: string; rate: number; force: boolean; };
+const jobs: UtterJob[] = [];
+let pumping = false;
+let pumpTail: Promise<void> = Promise.resolve();
 let listenStartedAt = 0;
 let quietHinted = false;
 let captureGen = 0;
@@ -130,7 +146,8 @@ function applyPayload(payload: PersistPayload | null | undefined) {
             original: String(r.original ?? ""),
             translation: String(r.translation ?? ""),
             fromLang: String(r.fromLang ?? "").trim() || undefined,
-            toLang: String(r.toLang ?? "").trim() || undefined
+            toLang: String(r.toLang ?? "").trim() || undefined,
+            speaker: String(r.speaker ?? "").trim() || undefined
         }))
         .slice(-MAX_HISTORY);
     lastOriginal = String(payload.original ?? "");
@@ -275,6 +292,86 @@ function resetCaptureState() {
     heardPeak = 0;
     quietHinted = false;
     hpState = { x: 0, y: 0 };
+    speakerVotes.clear();
+    lastSpeakerSample = 0;
+    utteranceId = "";
+    utteranceSpeaker = "";
+    seenId = "";
+    seenSince = 0;
+}
+
+function currentSource(): { id: string; name: string; } {
+    if (audioSource === "mic") {
+        const name = activeSpeakerName(true).trim() || "You";
+        return { id: "self", name };
+    }
+    const remote = rankedSpeakers(true)[0];
+    if (remote) return { id: remote.id, name: remote.name };
+    const self = localTalker();
+    if (self) return self;
+    return { id: SYSTEM_ID, name: SYSTEM_LABEL };
+}
+
+function winningSpeaker() {
+    let best = "";
+    let count = 0;
+    let total = 0;
+    let userBest = "";
+    let userCount = 0;
+    for (const [name, votes] of speakerVotes) {
+        total += votes;
+        if (votes > count) {
+            count = votes;
+            best = name;
+        }
+        if (name !== SYSTEM_LABEL && votes > userCount) {
+            userCount = votes;
+            userBest = name;
+        }
+    }
+    speakerVotes.clear();
+    lastSpeakerSample = 0;
+    if (audioSource === "mic")
+        return userBest || best || utteranceSpeaker.trim() || activeSpeakerName(true).trim() || "You";
+    if (userBest && userCount >= Math.max(2, total * 0.25))
+        return userBest;
+    if (!best) return utteranceSpeaker.trim() || SYSTEM_LABEL;
+    return best.trim();
+}
+
+function considerSpeaker(now: number): string | null {
+    if (now - lastSpeakerSample < 160) return null;
+    lastSpeakerSample = now;
+    const hit = currentSource();
+    speakerVotes.set(hit.name, (speakerVotes.get(hit.name) ?? 0) + 1);
+
+    if (seenId !== hit.id) {
+        seenId = hit.id;
+        seenSince = now;
+        return null;
+    }
+
+    const held = now - seenSince;
+    if (!utteranceId) {
+        const needed = hit.id === SYSTEM_ID ? 1100 : 250;
+        if (held < needed) return null;
+        utteranceId = hit.id;
+        utteranceSpeaker = hit.name;
+        return null;
+    }
+    if (hit.id === utteranceId) {
+        utteranceSpeaker = hit.name;
+        return null;
+    }
+    const needed = hit.id === SYSTEM_ID ? 1100 : 850;
+    if (held < needed || !pcmBuf.length) return null;
+
+    const labeled = winningSpeaker();
+    utteranceId = hit.id;
+    utteranceSpeaker = hit.name;
+    speakerVotes.set(hit.name, 1);
+    seenSince = now;
+    return labeled;
 }
 
 function stopTracks() {
@@ -368,8 +465,8 @@ function normalizePcm(samples: Float32Array) {
         const a = Math.abs(samples[i]);
         if (a > peak) peak = a;
     }
-    if (peak < 0.0008) return samples;
-    const gain = Math.min(8, 0.85 / peak);
+    if (peak < 0.00035) return samples;
+    const gain = Math.min(16, 0.92 / peak);
     if (gain < 1.04) return samples;
     const out = new Float32Array(samples.length);
     for (let i = 0; i < samples.length; i++)
@@ -401,7 +498,7 @@ function attachCaptureGraph(stream: MediaStream) {
 
     graphSrc = audioCtx.createMediaStreamSource(stream);
     graphPreamp = audioCtx.createGain();
-    graphPreamp.gain.value = audioSource === "mic" ? 1.8 : 3.2;
+    graphPreamp.gain.value = audioSource === "mic" ? 2.4 : 5;
     tapAnalyser = audioCtx.createAnalyser();
     tapAnalyser.fftSize = 2048;
     tapAnalyser.smoothingTimeConstant = 0;
@@ -539,17 +636,28 @@ function listenStatus() {
     }
 }
 
-async function flushUtterance(sampleRate?: number, force = false) {
-    if (busyTranscribe || !pcmBuf.length) return;
+function enqueueChunks(chunks: Float32Array[], speaker: string, rate: number, force: boolean) {
+    if (!chunks.length) return;
+    jobs.push({ chunks, speaker, rate, force });
+    void pumpJobs();
+}
+
+function enqueueCurrent(force = false, speaker = "") {
+    if (!pcmBuf.length) return;
     const chunks = pcmBuf;
+    const who = (speaker.trim() || winningSpeaker() || utteranceSpeaker).trim();
+    const rate = audioCtx?.sampleRate || TARGET_SR;
     pcmBuf = [];
     inSpeech = false;
-    const rate = sampleRate || audioCtx?.sampleRate || TARGET_SR;
-    let merged = mergePcm(chunks);
-    const durationSec = merged.length / Math.max(1, rate);
-    const minSec = force ? 0.4 : MIN_UTTER_SEC;
+    enqueueChunks(chunks, who, rate, force);
+}
+
+async function transcribeJob(job: UtterJob) {
+    let merged = mergePcm(job.chunks);
+    const durationSec = merged.length / Math.max(1, job.rate);
+    const minSec = job.force ? 0.4 : MIN_UTTER_SEC;
     if (durationSec < minSec) {
-        setStatus(idleStatus());
+        if (listening) setStatus(idleStatus());
         return;
     }
     busyTranscribe = true;
@@ -563,19 +671,19 @@ async function flushUtterance(sampleRate?: number, force = false) {
         for (let i = 0; i < merged.length; i++) energy += merged[i] * merged[i];
         const utterRms = Math.sqrt(energy / Math.max(1, merged.length));
         const minRms = audioSource === "system" ? SYSTEM_MIN_UTTER_RMS : MIN_UTTER_RMS;
-        if (!force && utterRms < minRms) {
-            setStatus(idleStatus());
+        if (!job.force && utterRms < minRms) {
+            if (listening) setStatus(idleStatus());
             return;
         }
-        if (force && utterRms < 0.002) {
-            setStatus(idleStatus());
+        if (job.force && utterRms < 0.002) {
+            if (listening) setStatus(idleStatus());
             return;
         }
-        const pcm16 = downsampleTo16k(merged, rate);
+        const pcm16 = downsampleTo16k(merged, job.rate);
         const heard = await transcribeOpenRouter(pcm16, TARGET_SR, apiKey, model, fromLang);
         const text = heard.text.trim();
         if (!text || isJunkTranscript(text) || sameSpokenText(text, lastOriginal) || sameSpokenText(text, lastTranslation)) {
-            setStatus(idleStatus());
+            if (listening) setStatus(idleStatus());
             return;
         }
         lastOriginal = text;
@@ -592,13 +700,19 @@ async function flushUtterance(sampleRate?: number, force = false) {
         if (sameSpokenText(text, lastTranslation))
             spokenLang = normalizeLangCode(toLang) || spokenLang;
         if (isJunkTranscript(lastTranslation)) {
-            setStatus(idleStatus());
+            if (listening) setStatus(idleStatus());
             return;
         }
-        history.push({ original: text, translation: lastTranslation, fromLang: spokenLang, toLang });
+        history.push({
+            original: text,
+            translation: lastTranslation,
+            fromLang: spokenLang,
+            toLang,
+            speaker: job.speaker || undefined
+        });
         if (history.length > MAX_HISTORY) history = history.slice(-MAX_HISTORY);
         schedulePersist();
-        setStatus(idleStatus());
+        if (listening) setStatus(idleStatus());
     } catch (e) {
         const msg = String(e).replace(/^Error:\s*/, "");
         setStatus((/failed to fetch|networkerror/i.test(msg)
@@ -610,6 +724,23 @@ async function flushUtterance(sampleRate?: number, force = false) {
     }
 }
 
+async function pumpJobs() {
+    if (pumping) return pumpTail;
+    pumping = true;
+    pumpTail = (async () => {
+        try {
+            while (jobs.length) {
+                const job = jobs.shift()!;
+                await transcribeJob(job);
+            }
+        } finally {
+            pumping = false;
+        }
+    })();
+    await pumpTail;
+    if (jobs.length) return pumpJobs();
+}
+
 function shouldFlush(now: number) {
     if (!inSpeech) return false;
     const elapsed = now - speechStartedAt;
@@ -617,6 +748,22 @@ function shouldFlush(now: number) {
     const minSpeech = audioSource === "system" ? SYSTEM_MIN_SPEECH_MS : MIN_SPEECH_MS;
     if (elapsed >= MAX_UTTER_MS && silentFor >= 280) return true;
     return silentFor >= SILENCE_MS && elapsed >= minSpeech;
+}
+
+let voiceHint = false;
+let voiceHintAt = 0;
+
+function voiceHintActive(now: number) {
+    if (now - voiceHintAt < 120) return voiceHint;
+    voiceHintAt = now;
+    try {
+        voiceHint = audioSource === "mic"
+            ? Boolean(localTalker())
+            : Boolean(rankedSpeakers(false).length || localTalker());
+    } catch {
+        voiceHint = false;
+    }
+    return voiceHint;
 }
 
 function onPcmFrame(input: Float32Array) {
@@ -627,33 +774,83 @@ function onPcmFrame(input: Float32Array) {
     level = rms;
     heardPeak = Math.max(heardPeak, rms);
 
+    const now = Date.now();
+    const hinted = voiceHintActive(now);
     if (!inSpeech) {
-        noiseRms = noiseRms * 0.97 + rms * 0.03;
+        if (rms < Math.max(SPEECH_RMS, noiseRms * 1.6))
+            noiseRms = noiseRms * 0.992 + rms * 0.008;
         preroll.push(new Float32Array(input));
         if (preroll.length > PREROLL_CHUNKS) preroll.shift();
     }
 
-    const now = Date.now();
-    const speechFloor = audioSource === "system" ? SYSTEM_SPEECH_RMS : SPEECH_RMS;
-    const gate = Math.max(speechFloor, noiseRms * (audioSource === "system" ? 2.4 : 2.0));
-    const loud = rms >= gate;
+    const speechFloor = (audioSource === "system" ? SYSTEM_SPEECH_RMS : SPEECH_RMS) * (hinted ? 0.55 : 1);
+    const gate = Math.max(speechFloor, noiseRms * (hinted ? 1.2 : 1.65));
+    const loud = rms >= gate || (hinted && rms >= 0.0014);
 
     if (loud) {
         lastLoudAt = now;
+        const previous = considerSpeaker(now);
+        if (previous) {
+            enqueueCurrent(true, previous);
+            preroll = [];
+            inSpeech = false;
+        }
+        const frame = new Float32Array(input);
         if (!inSpeech) {
             inSpeech = true;
             speechStartedAt = now;
             pcmBuf = preroll.slice();
             preroll = [];
+            pcmBuf.push(frame);
             setStatus("Waiting for the sentence to finish…");
         } else {
-            pcmBuf.push(new Float32Array(input));
+            pcmBuf.push(frame);
         }
     } else if (inSpeech) {
         pcmBuf.push(new Float32Array(input));
     }
 
-    if (shouldFlush(now)) void flushUtterance();
+    if (shouldFlush(now)) enqueueCurrent(false);
+}
+
+function watchStream(stream: MediaStream, gen: number) {
+    const track = stream.getAudioTracks()[0];
+    if (!track) return;
+    let lastRecover = 0;
+    const recover = () => {
+        if (gen !== captureGen || !listening) return;
+        const now = Date.now();
+        if (now - lastRecover < 2000) return;
+        lastRecover = now;
+        void recapture(gen);
+    };
+    track.addEventListener("ended", recover);
+    track.addEventListener("mute", () => {
+        window.setTimeout(() => {
+            if (gen === captureGen && listening && track.muted) recover();
+        }, 1200);
+    });
+}
+
+async function recapture(gen: number) {
+    if (recapturing || gen !== captureGen || !listening) return;
+    recapturing = true;
+    try {
+        setStatus("Reconnecting audio…");
+        const next = await getCaptureStream(audioSource);
+        if (gen !== captureGen || !listening) {
+            dropStream(next.stream);
+            return;
+        }
+        attachCaptureGraph(next.stream);
+        watchStream(next.stream, gen);
+        setStatus(listenStatus());
+    } catch {
+        if (gen === captureGen && listening)
+            setStatus("Audio dropped — press Listen again");
+    } finally {
+        recapturing = false;
+    }
 }
 
 function dropStream(stream: MediaStream | null | undefined) {
@@ -687,6 +884,7 @@ export async function startListening() {
             return;
         }
         attachCaptureGraph(captured.stream);
+        watchStream(captured.stream, gen);
         setStatus(listenStatus());
         if (loopTimer != null) window.clearInterval(loopTimer);
         loopTimer = window.setInterval(() => {
@@ -697,7 +895,7 @@ export async function startListening() {
                 quietHinted = true;
                 setStatus("No speech heard — try another source in Advanced");
             }
-            if (shouldFlush(Date.now())) void flushUtterance();
+            if (shouldFlush(Date.now())) enqueueCurrent(false);
         }, 200);
     } catch (e) {
         if (gen !== captureGen) return;
@@ -718,15 +916,15 @@ export async function stopListening(_keepModel = false) {
     }
     if (drainPromise) return drainPromise;
 
-    const leftover = pcmBuf;
-    const leftoverSpeech = leftover.length > 0;
     const rate = audioCtx?.sampleRate || TARGET_SR;
+    if (pcmBuf.length)
+        enqueueChunks(pcmBuf, (winningSpeaker() || utteranceSpeaker).trim(), rate, true);
+    pcmBuf = [];
     preroll = [];
     inSpeech = false;
-    pcmBuf = leftover;
     stopCaptureGraph();
 
-    if (!busyTranscribe && !leftoverSpeech) {
+    if (!busyTranscribe && !jobs.length && !pumping) {
         resetCaptureState();
         partial = false;
         ready = false;
@@ -738,9 +936,7 @@ export async function stopListening(_keepModel = false) {
         try {
             if (!/^(Transcribing|Translating)/.test(status))
                 setStatus("Finishing…");
-            await waitWhileBusy();
-            if (pcmBuf.length) await flushUtterance(rate, true);
-            await waitWhileBusy();
+            await pumpJobs();
         } finally {
             resetCaptureState();
             partial = false;

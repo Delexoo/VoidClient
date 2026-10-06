@@ -203,8 +203,10 @@ function speakingFromStores(): Map<string, number> {
     if (channelId) {
         try {
             const speaking = ChannelRTCStore.getSpeakingParticipants?.(channelId) ?? [];
+            const explicit = speaking.some(p => p?.speaking === true);
             for (const p of speaking) {
                 if (p?.speaking === false) continue;
+                if (explicit && p?.speaking !== true) continue;
                 considerSpeaker(ids, p?.user?.id || p?.id, true, Number(p?.voiceDb || 0), Number(p?.lastSpoke || 0));
             }
         } catch { /* ignore */ }
@@ -605,6 +607,50 @@ function owner(id: string): OwnerState {
         owners.set(id, state);
     }
     return state;
+}
+
+export function localTalker(): { id: string; name: string; } | null {
+    const selfId = currentUserId();
+    if (!selfId) return null;
+    const mes = MediaEngineStore as unknown as {
+        isSpeaking?(id: string): boolean;
+        getSpeakingWhileMuted?(): boolean;
+        getInputDetected?(): boolean | null;
+    };
+    let talking = false;
+    try {
+        talking = mes.isSpeaking?.(selfId) === true
+            || mes.getSpeakingWhileMuted?.() === true
+            || mes.getInputDetected?.() === true;
+    } catch {
+        talking = false;
+    }
+    if (!talking) return null;
+    return { id: selfId, name: displayName(selfId) || "You" };
+}
+
+export function rankedSpeakers(excludeSelfIfOthers = true): { id: string; name: string; score: number; }[] {
+    const scores = speakingFromStores();
+    const self = currentUserId();
+    let hits = [...scores.entries()]
+        .map(([id, score]) => ({ id, name: displayName(id), score }))
+        .filter(hit => hit.name);
+    if (excludeSelfIfOthers && self && hits.some(hit => hit.id !== self))
+        hits = hits.filter(hit => hit.id !== self);
+    hits.sort((a, b) => b.score - a.score);
+    return hits;
+}
+
+export function activeSpeakerName(preferSelf = false): string {
+    if (preferSelf) {
+        const selfId = currentUserId();
+        return selfId ? displayName(selfId) : "";
+    }
+    return rankedSpeakers(true)[0]?.name
+        || (() => {
+            const id = lastSpeaker(Date.now());
+            return id ? displayName(id) : "";
+        })();
 }
 
 export function setUltraEnabled(id: string, enabled: boolean) {

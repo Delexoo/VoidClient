@@ -8,9 +8,8 @@ import { Delexo } from "../_delexo/author";
 import { isJunkTranscript, languagePairLabel } from "../_delexo/langNames";
 import * as Ultra from "../_delexo/ultraVoiceOverlay";
 import { definePluginSettings } from "@api/Settings";
-import definePlugin, { OptionType } from "@utils/types";
 import { getOpenRouterKey } from "@utils/openRouterKey";
-import { React, Text, useState } from "@webpack/common";
+import definePlugin, { OptionType } from "@utils/types";
 
 import * as Engine from "./engine";
 import managedStyle from "./style.css?managed";
@@ -48,79 +47,7 @@ const TO_LANGS: [string, string][] = [
     ["ko", "Korean"],
 ];
 
-function EyeGlyph({ off }: { off: boolean; }) {
-    return off ? (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
-            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
-            <line x1="1" y1="1" x2="23" y2="23" />
-        </svg>
-    ) : (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-            <circle cx="12" cy="12" r="3" />
-        </svg>
-    );
-}
-
-function ApiKeyField() {
-    const [show, setShow] = useState(false);
-    const [value, setValue] = useState(() => String(settings.store.openaiApiKey || ""));
-
-    function onChange(event: React.ChangeEvent<HTMLInputElement>) {
-        const next = event.target.value;
-        setValue(next);
-        settings.store.openaiApiKey = next;
-        Engine.setApiKey(next.trim());
-    }
-
-    return (
-        <div className="spyt-live-key">
-            <Text className="spyt-live-key-title" variant="text-md/medium">OpenRouter API key</Text>
-            <Text className="spyt-live-key-desc" variant="text-sm/normal">Uses the OpenRouter key from the top of the Plugins page. Paste one here only if this plugin should use a different key.</Text>
-            <div className="spyt-live-key-row">
-                <input
-                    className="spyt-live-key-input"
-                    type={show ? "text" : "password"}
-                    value={value}
-                    onChange={onChange}
-                    placeholder="sk-or-v1-..."
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck={false}
-                    name="openrouter-api-key"
-                />
-                <button
-                    className="spyt-live-key-eye"
-                    type="button"
-                    aria-label={show ? "Hide API key" : "Show API key"}
-                    aria-pressed={show}
-                    onClick={() => setShow(on => !on)}
-                >
-                    <EyeGlyph off={show} />
-                </button>
-            </div>
-        </div>
-    );
-}
-
 const settings = definePluginSettings({
-    apiKeyField: {
-        type: OptionType.COMPONENT,
-        component: ApiKeyField
-    },
-    openaiApiKey: {
-        type: OptionType.STRING,
-        displayName: "OpenRouter API key",
-        description: "Paste your OpenRouter key here.",
-        placeholder: "sk-or-v1-...",
-        default: "",
-        hidden: true,
-        onChange(v: string) {
-            Engine.setApiKey(String(v || "").trim());
-        }
-    },
     showOriginal: {
         type: OptionType.BOOLEAN,
         description: "Show the heard/original line as well as the translation",
@@ -269,8 +196,8 @@ function sourceHint(source: Engine.AudioSource) {
 function syncEngineLangs() {
     Engine.setLanguages(settings.store.fromLang || "auto", settings.store.toLang || "en");
     Engine.setAudioSource(Engine.parseAudioSource(settings.store.audioSource));
-    const fromSettings = (settings.store.openaiApiKey || "").trim() || getOpenRouterKey();
-    if (fromSettings) Engine.setApiKey(fromSettings);
+    const sharedKey = getOpenRouterKey();
+    if (sharedKey) Engine.setApiKey(sharedKey);
     Engine.setModel();
 }
 
@@ -369,7 +296,7 @@ function mount() {
     poll();
     void Engine.loadApiKeyFromEnv().then(key => {
         if (key) setStatus("OpenRouter ready");
-        else setStatus("Add OpenRouter key in plugin settings");
+        else setStatus("Add an OpenRouter key at the top of the Plugins page");
         if (settings.store.autoListen && key) void startListen();
     });
 }
@@ -635,12 +562,12 @@ function setListenLook(on: boolean, label: string) {
 }
 
 function hasApiKey() {
-    return Engine.hasApiKey() || Boolean((settings.store.openaiApiKey || "").trim());
+    return Engine.hasApiKey() || Boolean(getOpenRouterKey());
 }
 
 function requireApiKey() {
     if (hasApiKey()) return true;
-    setStatus("Add OpenRouter key in plugin settings");
+    setStatus("Add an OpenRouter key at the top of the Plugins page");
     return false;
 }
 
@@ -763,7 +690,7 @@ function paintSpectrum(level: number, live: boolean) {
 }
 
 function rowKey(row: Engine.HistoryRow) {
-    return `${row.original}\n${row.translation}\n${row.fromLang || ""}\n${row.toLang || ""}`;
+    return `${row.speaker || ""}\n${row.original}\n${row.translation}\n${row.fromLang || ""}\n${row.toLang || ""}`;
 }
 
 function toggleLineOpen(plus: HTMLButtonElement) {
@@ -806,7 +733,7 @@ function emptyCaption(listening: boolean, hearing: boolean, partial: boolean) {
     if (partial) return "Transcribing…";
     if (listening && hearing) return "Hearing…";
     if (listening) return "Listening…";
-    if (!hasApiKey()) return "Add OpenRouter key in plugin settings";
+    if (!hasApiKey()) return "Add an OpenRouter key at the top of the Plugins page";
     return "Press Listen";
 }
 
@@ -855,7 +782,15 @@ function renderFeed(data: Engine.EngineSnapshot, listening: boolean, hearing: bo
 
         const text = document.createElement("span");
         text.className = "spyt-line-text";
-        text.textContent = translated;
+        const who = (row.speaker || "").trim();
+        if (who) {
+            const name = document.createElement("span");
+            name.className = who === "System audio" ? "spyt-line-who spyt-line-system" : "spyt-line-who";
+            name.textContent = who;
+            text.append(name, document.createTextNode(`: ${translated}`));
+        } else {
+            text.textContent = translated;
+        }
         main.appendChild(text);
         el.appendChild(main);
 
@@ -905,7 +840,7 @@ function poll() {
 
     const rows = historyRows(data);
     const latest = rows[rows.length - 1];
-    const paint = `${listening}|${hearing}|${data.partial}|${rows.length}|${latest?.original ?? ""}|${latest?.translation ?? ""}|${data.original}|${data.translation}`;
+    const paint = `${listening}|${hearing}|${data.partial}|${rows.length}|${latest?.speaker ?? ""}|${latest?.original ?? ""}|${latest?.translation ?? ""}|${data.original}|${data.translation}`;
     if (paint === lastPaint) return;
     lastPaint = paint;
     renderFeed(data, listening, hearing);
