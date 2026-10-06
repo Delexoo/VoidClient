@@ -12,10 +12,10 @@ import {
     IconUtils,
     PresenceStore,
     useEffect,
+    useLayoutEffect,
     useRef,
     UserProfileStore,
     UserStore,
-    useLayoutEffect,
     useState,
     useStateFromStores,
 } from "@webpack/common";
@@ -161,6 +161,23 @@ function lockStyle(node: Element | null, props: Record<string, string>) {
         node.style.setProperty(key, value, "important");
 }
 
+function lockBox(node: Element | null, size: number, extra: Record<string, string> = {}) {
+    const px = `${size}px`;
+    lockStyle(node, {
+        width: px,
+        height: px,
+        "min-width": px,
+        "min-height": px,
+        "max-width": px,
+        "max-height": px,
+        display: "block",
+        flex: `0 0 ${px}`,
+        "object-fit": "contain",
+        "box-sizing": "border-box",
+        ...extra,
+    });
+}
+
 function bannerStyle(userId: string | undefined, profile: { banner?: string | null; accentColor?: number | null; } | undefined): CSSProperties {
     if (userId && profile?.banner) {
         const url = IconUtils.getUserBannerURL({
@@ -180,7 +197,7 @@ function bannerStyle(userId: string | undefined, profile: { banner?: string | nu
     if (typeof profile?.accentColor === "number" && profile.accentColor > 0) {
         return { backgroundColor: `#${profile.accentColor.toString(16).padStart(6, "0")}` };
     }
-    return { backgroundColor: "var(--background-tertiary, #1e1f22)" };
+    return { backgroundImage: "linear-gradient(135deg, #5865f2 0%, #2b2d55 100%)" };
 }
 
 function PreviewArt({
@@ -215,13 +232,9 @@ function PreviewArt({
             padding: "0",
             flex: `0 0 ${px}`,
         });
-        lockStyle(imgRef.current, {
-            width: px,
-            height: px,
-            "max-width": px,
-            "max-height": px,
+        lockBox(imgRef.current, size, {
             "object-fit": small ? "contain" : "cover",
-            display: "block",
+            "border-radius": small ? "4px" : "8px",
         });
     });
 
@@ -377,6 +390,8 @@ export function LiveProfilePreview() {
         : [];
     const seenBadge = new Set(officialBadges.map(b => b.src));
     const badges = [...officialBadges, ...extraBadges.filter(b => !seenBadge.has(b.src))];
+    const shownBadges = badges.slice(0, 8);
+    const hiddenBadges = badges.length - shownBadges.length;
     const hasCustom = Boolean(presence.text || presence.emojiUrl || presence.emojiName);
     const title = String(s.appName || "").trim();
     const details = resolveTemplate(s.details, s.activeName, displayName);
@@ -429,7 +444,7 @@ export function LiveProfilePreview() {
 
     return (
         <div className={cl("profile-preview")}>
-            <div className={cl("profile-kicker")}>Profile</div>
+            <div className={cl("profile-kicker")}>Preview</div>
             <div className={cl("preview-card")} ref={node => lockStyle(node, {
                 position: "relative",
                 width: "100%",
@@ -438,18 +453,22 @@ export function LiveProfilePreview() {
             })}>
                 <div
                     className={cl("cover")}
-                    style={bannerStyle(me?.id, profile)}
-                    ref={node => lockStyle(node, {
-                        width: "100%",
-                        height: "72px",
-                        "min-height": "72px",
-                        "max-height": "72px",
-                        overflow: "hidden",
-                        flex: "0 0 72px",
-                        "background-size": "cover",
-                        "background-position": "center",
-                        "background-repeat": "no-repeat",
-                    })}
+                    ref={node => {
+                        const paint = bannerStyle(me?.id, profile);
+                        lockStyle(node, {
+                            width: "100%",
+                            height: "88px",
+                            "min-height": "88px",
+                            "max-height": "88px",
+                            overflow: "hidden",
+                            flex: "0 0 88px",
+                            "background-size": "cover",
+                            "background-position": "center",
+                            "background-repeat": "no-repeat",
+                            "background-image": paint.backgroundImage ? String(paint.backgroundImage) : "none",
+                            "background-color": paint.backgroundColor ? String(paint.backgroundColor) : "transparent",
+                        });
+                    }}
                 />
                 <div className={cl("profile-body")}>
                     <div className={cl("profile-avatar-row")}>
@@ -459,24 +478,39 @@ export function LiveProfilePreview() {
                                     className={cl("profile-avatar")}
                                     src={me.getAvatarURL(void 0, 128, true)}
                                     alt=""
-                                    width={80}
-                                    height={80}
-                                    ref={node => lockStyle(node, {
-                                        width: "80px",
-                                        height: "80px",
-                                        "max-width": "80px",
-                                        "max-height": "80px",
+                                    width={72}
+                                    height={72}
+                                    ref={node => lockBox(node, 72, {
                                         "object-fit": "cover",
-                                        display: "block",
+                                        "border-radius": "50%",
+                                        border: "4px solid var(--background-secondary-alt, #2b2d31)",
                                     })}
                                 />
-                                <span className={cl("profile-status", `profile-status-${statusClass}`)} />
+                                <span
+                                    className={cl("profile-status", `profile-status-${statusClass}`)}
+                                    ref={node => lockBox(node, 16, {
+                                        position: "absolute",
+                                        right: "2px",
+                                        bottom: "2px",
+                                        "border-radius": "50%",
+                                        border: "3px solid var(--background-secondary-alt, #2b2d31)",
+                                        flex: "none",
+                                    })}
+                                />
                             </div>
                         )}
                         {hasCustom && (
                             <div className={cl("profile-custom")}>
                                 {presence.emojiUrl
-                                    ? <img src={presence.emojiUrl} alt="" />
+                                    ? (
+                                        <img
+                                            src={presence.emojiUrl}
+                                            alt=""
+                                            width={16}
+                                            height={16}
+                                            ref={node => lockBox(node, 16)}
+                                        />
+                                    )
                                     : presence.emojiName
                                         ? <span className={cl("profile-custom-emoji")}>{presence.emojiName}</span>
                                         : <span className={cl("profile-custom-plus")}>+</span>}
@@ -495,7 +529,15 @@ export function LiveProfilePreview() {
                             <>
                                 <span className={cl("profile-dot")}>•</span>
                                 <span className={cl("profile-tag")} title={clan.tag}>
-                                    {clanBadgeUrl(clan) ? <img src={clanBadgeUrl(clan)} alt="" /> : null}
+                                    {clanBadgeUrl(clan) ? (
+                                        <img
+                                            src={clanBadgeUrl(clan)}
+                                            alt=""
+                                            width={16}
+                                            height={16}
+                                            ref={node => lockBox(node, 16)}
+                                        />
+                                    ) : null}
                                     {clan.tag}
                                 </span>
                             </>
@@ -504,11 +546,31 @@ export function LiveProfilePreview() {
                             <span className={cl("profile-tag", "profile-tag-plate")}>{nameplate.label}</span>
                         ) : null}
                     </div>
-                    {badges.length > 0 && (
-                        <div className={cl("profile-badges")} aria-label="Profile badges">
-                            {badges.map(badge => (
-                                <img key={badge.key} src={badge.src} alt={badge.title} title={badge.title} />
+                    {shownBadges.length > 0 && (
+                        <div
+                            className={cl("profile-badges")}
+                            aria-label="Profile badges"
+                            ref={node => lockStyle(node, {
+                                display: "flex",
+                                "flex-wrap": "wrap",
+                                "align-items": "center",
+                                gap: "4px",
+                                overflow: "hidden",
+                                "max-height": "48px",
+                            })}
+                        >
+                            {shownBadges.map(badge => (
+                                <img
+                                    key={badge.key}
+                                    src={badge.src}
+                                    alt={badge.title}
+                                    title={badge.title}
+                                    width={20}
+                                    height={20}
+                                    ref={node => lockBox(node, 20)}
+                                />
                             ))}
+                            {hiddenBadges > 0 ? <span className={cl("profile-more")}>+{hiddenBadges}</span> : null}
                         </div>
                     )}
                     {bio ? (
@@ -593,8 +655,8 @@ export function LiveProfilePreview() {
             </div>
             <div className={cl("profile-note")}>
                 {enabled
-                    ? "Updates as you type. Friends see this on your profile."
-                    : "Preview only — turn on “Show on my profile” to share it."}
+                    ? "Friends see this on your profile."
+                    : "Turn on “Show on my profile” to share it."}
             </div>
             {!gameActivityEnabled && (
                 <div className={cl("profile-warn")}>

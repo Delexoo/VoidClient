@@ -305,7 +305,7 @@ function ProfileToggle() {
             tag="label"
             name="Show on my profile"
             id="rpcEnabled"
-            description="Friends see the status that’s turned on. Stay Online or Idle — Invisible hides it."
+            description="Friends see the status that is turned on. Invisible hides it."
             inlineSetting
         >
             <Switch
@@ -360,7 +360,7 @@ function PresetManager() {
                 <p className={cl("section-title")}>Saved statuses</p>
             </div>
             {presets.length === 0 ? (
-                <p className={cl("hint")}>Nothing saved yet. Fill this in below, then press Save preset. After that, click a picture here to turn it on.</p>
+                <p className={cl("hint")}>Nothing saved yet. Fill in a status below, then press Save.</p>
             ) : (
                 <div className={cl("presets")} style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {presets.map(preset => {
@@ -416,7 +416,19 @@ function PresetManager() {
                                         </span>
                                     ) : null}
                                 </span>
-                                <span className={cl("preset-name")}>{preset.name}</span>
+                                <span
+                                    className={cl("preset-name")}
+                                    ref={node => lockStyle(node, {
+                                        display: "block",
+                                        width: "96px",
+                                        overflow: "hidden",
+                                        "text-overflow": "ellipsis",
+                                        "white-space": "nowrap",
+                                        "text-align": "center",
+                                    })}
+                                >
+                                    {preset.name}
+                                </span>
                             </button>
                         );
                     })}
@@ -454,9 +466,7 @@ function SaveBar() {
             <div className={cl("section-head")}>
                 <p className={cl("section-title")}>Save this status</p>
             </div>
-            <p className={cl("hint")}>
-                Fill everything in above, then save. That makes a preset you can turn on later by clicking its picture.
-            </p>
+            <p className={cl("hint")}>Name it, then save. Click a picture above to switch.</p>
             <div className={cl("save-row")}>
                 <TextInput
                     value={saveName}
@@ -530,15 +540,14 @@ function RpcFields() {
     const s = settings.use(["type", "timestampMode"] as never);
 
     return (
-        <div className={cl("ml")}>
+        <div className={cl("section")}>
             <div className={cl("section-head")}>
-                <p className={cl("section-title")}>Fill this in</p>
+                <p className={cl("section-title")}>What people see</p>
             </div>
-            <p className={cl("hint")}>Set the title, lines, and pictures first. Save when it looks right in the preview.</p>
+            <p className={cl("hint")}>The title is the bold name. The lines sit under it. Check the preview on the right.</p>
             <SelectSetting
                 settingsKey="type"
                 label="Status type"
-                hint="Playing, Streaming, Listening, Watching, or Competing."
                 options={[
                     { label: "Playing", value: ActivityType.PLAYING, default: true },
                     { label: "Streaming", value: ActivityType.STREAMING },
@@ -548,13 +557,15 @@ function RpcFields() {
                 ]}
             />
 
-            <PairSetting data={[
-                { settingsKey: "appName", label: "Title", isValid: makeValidator(128, true), placeholder: "My activity", hint: "The bold name people see, like a game or app." },
-                { settingsKey: "appID", label: "App ID (optional)", isValid: isAppIdValid, placeholder: "From Developer Portal", hint: "Leave blank unless you uploaded pictures in the Developer Portal. Discord still gets an app ID so friends can see this." },
-            ]} />
+            <SingleSetting
+                settingsKey="appName"
+                label="Title"
+                isValid={makeValidator(128, true)}
+                placeholder="Camera, Harvard Online, Visual Studio Code"
+            />
 
             <PairSetting data={[
-                { settingsKey: "details", label: "Line 1", isValid: maxLength128, placeholder: "What you’re up to", hint: "First line under the title. You can use {user}, {time}, {date}." },
+                { settingsKey: "details", label: "Line 1", isValid: maxLength128, placeholder: "What you’re up to", hint: "You can type {user}, {time}, or {date}." },
                 { settingsKey: "detailsURL", label: "Line 1 link", isValid: isUrlValid, placeholder: "https://…" },
             ]} />
 
@@ -574,8 +585,15 @@ function RpcFields() {
 
             <Fold title="Pictures">
                 <Text variant="text-xs/normal" className={cl("hint")}>
-                    Paste a direct image link (right-click → Copy image address), not a Discord CDN link.
+                    Paste a direct image link. Right-click the image and choose Copy image address.
                 </Text>
+                <SingleSetting
+                    settingsKey="appID"
+                    label="App ID"
+                    isValid={isAppIdValid}
+                    placeholder="Only if you uploaded images in the Developer Portal"
+                    hint="Leave blank for a normal image link. We attach an app ID for you."
+                />
                 <PairSetting data={[
                     { settingsKey: "imageBig", label: "Large picture", isValid: isImageKeyValid, placeholder: "https://i.imgur.com/…" },
                     { settingsKey: "imageBigTooltip", label: "Large picture hover text", isValid: maxLength128 },
@@ -661,7 +679,7 @@ function pinLayout(root: HTMLDivElement) {
 
     lockStyle(root, {
         display: "grid",
-        "grid-template-columns": "minmax(0, 1fr) 280px",
+        "grid-template-columns": "minmax(0, 1fr) 300px",
         "grid-template-rows": "minmax(0, 1fr)",
         gap: "16px",
         width: "100%",
@@ -684,13 +702,24 @@ function pinLayout(root: HTMLDivElement) {
         "grid-column": "2",
         "grid-row": "1",
         position: "relative",
-        width: "280px",
-        "max-width": "280px",
+        width: "300px",
+        "max-width": "300px",
         "min-width": "0",
         "min-height": "0",
         "max-height": "100%",
         overflow: "auto",
     });
+
+    const close = dialog?.querySelector("button[aria-label='Close'], button[class*='closeButton']");
+    if (close instanceof HTMLElement) {
+        lockStyle(close, {
+            position: "absolute",
+            top: "12px",
+            right: "12px",
+            "z-index": "20",
+            margin: "0",
+        });
+    }
 
     if (host) {
         const sections = [...host.children].filter((el): el is HTMLElement => el.tagName === "SECTION");
@@ -705,7 +734,7 @@ function pinLayout(root: HTMLDivElement) {
     const scrollers: HTMLElement[] = [];
     let node: HTMLElement | null = root.parentElement;
     while (node && node !== dialog) {
-        const overflowY = getComputedStyle(node).overflowY;
+        const { overflowY } = getComputedStyle(node);
         if (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") scrollers.push(node);
         node = node.parentElement;
     }
@@ -722,7 +751,7 @@ function pinLayout(root: HTMLDivElement) {
     }
 
     const fit = () => {
-        const top = root.getBoundingClientRect().top;
+        const { top } = root.getBoundingClientRect();
         const bottom = dialog?.getBoundingClientRect().bottom ?? window.innerHeight;
         const height = Math.max(280, Math.floor(Math.min(window.innerHeight, bottom) - top - 16));
         root.style.height = `${height}px`;
