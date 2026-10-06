@@ -1007,6 +1007,7 @@ function makeResizable(box: HTMLElement, signal: AbortSignal) {
 export default definePlugin({
     name: "LiveVoiceTranslate",
     description: "Listen to Discord, system audio, or your mic and translate speech as it happens. Uses a low-cost OpenRouter speech model.",
+    enabledByDefault: true,
     tags: ["Voice", "Utility"],
     searchTerms: ["translate", "speech", "caption", "openai", "tagalog", "delexo"],
     authors: [Delexo],
