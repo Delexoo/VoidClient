@@ -228,6 +228,12 @@ function NotesField() {
     );
 }
 
+function lockStyle(node: Element | null | undefined, props: Record<string, string>) {
+    if (!(node instanceof HTMLElement)) return;
+    for (const [key, value] of Object.entries(props))
+        node.style.setProperty(key, value, "important");
+}
+
 function PresetThumb({ src, appId, name }: { src?: string; appId?: string; name: string; }) {
     const [url, setUrl] = useState("");
     const [fallback, setFallback] = useState("");
@@ -259,7 +265,19 @@ function PresetThumb({ src, appId, name }: { src?: string; appId?: string; name:
                 className={cl("preset-art")}
                 src={url}
                 alt=""
+                width={96}
+                height={96}
                 referrerPolicy="no-referrer"
+                ref={node => lockStyle(node, {
+                    position: "absolute",
+                    inset: "0",
+                    width: "96px",
+                    height: "96px",
+                    "max-width": "96px",
+                    "max-height": "96px",
+                    "object-fit": "cover",
+                    display: "block",
+                })}
                 onError={() => {
                     if (fallback && fallback !== url) {
                         setUrl(fallback);
@@ -344,7 +362,7 @@ function PresetManager() {
             {presets.length === 0 ? (
                 <p className={cl("hint")}>Nothing saved yet. Fill this in below, then press Save preset. After that, click a picture here to turn it on.</p>
             ) : (
-                <div className={cl("presets")}>
+                <div className={cl("presets")} style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                     {presets.map(preset => {
                         const on = preset.fileName === active && enabled;
                         return (
@@ -354,9 +372,29 @@ function PresetManager() {
                                 className={cl("preset", on && "preset-on")}
                                 title={on ? `${preset.name} is on` : `Turn on ${preset.name}`}
                                 disabled={busy}
+                                ref={node => lockStyle(node, {
+                                    width: "96px",
+                                    "max-width": "96px",
+                                    "min-width": "0",
+                                    height: "auto",
+                                    overflow: "hidden",
+                                    padding: "0",
+                                    flex: "0 0 96px",
+                                })}
                                 onClick={() => turnOn(preset.fileName)}
                             >
-                                <span className={cl("preset-media")}>
+                                <span
+                                    className={cl("preset-media")}
+                                    ref={node => lockStyle(node, {
+                                        display: "block",
+                                        position: "relative",
+                                        width: "96px",
+                                        height: "96px",
+                                        "max-width": "96px",
+                                        "max-height": "96px",
+                                        overflow: "hidden",
+                                    })}
+                                >
                                     <PresetThumb
                                         src={preset.imageBig}
                                         appId={preset.appID}
@@ -620,6 +658,49 @@ function pinLayout(root: HTMLDivElement) {
     const host = root.closest<HTMLElement>(".vc-settings-modal-content");
     dialog?.classList.add("vc-arp-open");
     host?.classList.add("vc-arp-host");
+
+    lockStyle(root, {
+        display: "grid",
+        "grid-template-columns": "minmax(0, 1fr) 280px",
+        "grid-template-rows": "minmax(0, 1fr)",
+        gap: "16px",
+        width: "100%",
+        "max-width": "100%",
+        "min-width": "0",
+        "min-height": "0",
+        overflow: "hidden",
+        position: "relative",
+    });
+    lockStyle(root.querySelector(":scope > .vc-arp-pane"), {
+        "grid-column": "1",
+        "grid-row": "1",
+        display: "flex",
+        "flex-direction": "column",
+        "min-width": "0",
+        "min-height": "0",
+        overflow: "auto",
+    });
+    lockStyle(root.querySelector(":scope > .vc-arp-side"), {
+        "grid-column": "2",
+        "grid-row": "1",
+        position: "relative",
+        width: "280px",
+        "max-width": "280px",
+        "min-width": "0",
+        "min-height": "0",
+        "max-height": "100%",
+        overflow: "auto",
+    });
+
+    if (host) {
+        const sections = [...host.children].filter((el): el is HTMLElement => el.tagName === "SECTION");
+        lockStyle(sections[0], { display: "none" });
+        lockStyle(sections.at(-1)?.firstElementChild as HTMLElement | undefined ?? null, { display: "none" });
+        for (const child of host.children) {
+            if (child instanceof HTMLElement && child.querySelector(".vc-arp-about-anchor"))
+                lockStyle(child, { display: "none" });
+        }
+    }
 
     const scrollers: HTMLElement[] = [];
     let node: HTMLElement | null = root.parentElement;

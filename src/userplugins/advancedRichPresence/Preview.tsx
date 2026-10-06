@@ -15,6 +15,7 @@ import {
     useRef,
     UserProfileStore,
     UserStore,
+    useLayoutEffect,
     useState,
     useStateFromStores,
 } from "@webpack/common";
@@ -154,6 +155,12 @@ export async function resolvePreviewImage(key: string | undefined, appId: string
     return withPngFormat(assetKeyToUrl(resolved, appId, size) || assetKeyToUrl(raw, appId, size));
 }
 
+function lockStyle(node: Element | null, props: Record<string, string>) {
+    if (!(node instanceof HTMLElement)) return;
+    for (const [key, value] of Object.entries(props))
+        node.style.setProperty(key, value, "important");
+}
+
 function bannerStyle(userId: string | undefined, profile: { banner?: string | null; accentColor?: number | null; } | undefined): CSSProperties {
     if (userId && profile?.banner) {
         const url = IconUtils.getUserBannerURL({
@@ -193,6 +200,30 @@ function PreviewArt({
     const [url, setUrl] = useState("");
     const [fallback, setFallback] = useState("");
     const [failed, setFailed] = useState(false);
+    const frameRef = useRef<HTMLElement>(null);
+    const imgRef = useRef<HTMLImageElement>(null);
+    const size = small ? 24 : 72;
+    const px = `${size}px`;
+
+    useLayoutEffect(() => {
+        lockStyle(frameRef.current, {
+            width: px,
+            height: px,
+            "max-width": px,
+            "max-height": px,
+            overflow: "hidden",
+            padding: "0",
+            flex: `0 0 ${px}`,
+        });
+        lockStyle(imgRef.current, {
+            width: px,
+            height: px,
+            "max-width": px,
+            "max-height": px,
+            "object-fit": small ? "contain" : "cover",
+            display: "block",
+        });
+    });
 
     useEffect(() => {
         let alive = true;
@@ -226,7 +257,10 @@ function PreviewArt({
             src={url}
             alt=""
             title={label}
+            width={size}
+            height={size}
             referrerPolicy="no-referrer"
+            ref={imgRef}
             onError={() => {
                 if (fallback && fallback !== url) {
                     setUrl(fallback);
@@ -244,6 +278,7 @@ function PreviewArt({
             type="button"
             className={cl("profile-art-btn", small && "profile-art-btn-small")}
             title={label || href}
+            ref={node => { frameRef.current = node; }}
             onClick={() => openUrl(href)}
         >
             {img}
@@ -395,8 +430,27 @@ export function LiveProfilePreview() {
     return (
         <div className={cl("profile-preview")}>
             <div className={cl("profile-kicker")}>Profile</div>
-            <div className={cl("preview-card")}>
-                <div className={cl("cover")} style={bannerStyle(me?.id, profile)} />
+            <div className={cl("preview-card")} ref={node => lockStyle(node, {
+                position: "relative",
+                width: "100%",
+                "max-width": "100%",
+                overflow: "hidden",
+            })}>
+                <div
+                    className={cl("cover")}
+                    style={bannerStyle(me?.id, profile)}
+                    ref={node => lockStyle(node, {
+                        width: "100%",
+                        height: "72px",
+                        "min-height": "72px",
+                        "max-height": "72px",
+                        overflow: "hidden",
+                        flex: "0 0 72px",
+                        "background-size": "cover",
+                        "background-position": "center",
+                        "background-repeat": "no-repeat",
+                    })}
+                />
                 <div className={cl("profile-body")}>
                     <div className={cl("profile-avatar-row")}>
                         {me && (
@@ -405,6 +459,16 @@ export function LiveProfilePreview() {
                                     className={cl("profile-avatar")}
                                     src={me.getAvatarURL(void 0, 128, true)}
                                     alt=""
+                                    width={80}
+                                    height={80}
+                                    ref={node => lockStyle(node, {
+                                        width: "80px",
+                                        height: "80px",
+                                        "max-width": "80px",
+                                        "max-height": "80px",
+                                        "object-fit": "cover",
+                                        display: "block",
+                                    })}
                                 />
                                 <span className={cl("profile-status", `profile-status-${statusClass}`)} />
                             </div>
