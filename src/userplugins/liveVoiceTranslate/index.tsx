@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Delexo } from "../_delexo/author";
-import { isJunkTranscript, languagePairLabel } from "../_delexo/langNames";
-import * as Ultra from "../_delexo/ultraVoiceOverlay";
+import * as DataStore from "@api/DataStore";
 import { definePluginSettings } from "@api/Settings";
 import { getOpenRouterKey } from "@utils/openRouterKey";
 import definePlugin, { OptionType } from "@utils/types";
 
+import { Delexo } from "../_delexo/author";
+import { isJunkTranscript, languagePairLabel } from "../_delexo/langNames";
+import * as Ultra from "../_delexo/ultraVoiceOverlay";
 import * as Engine from "./engine";
 import managedStyle from "./style.css?managed";
 
@@ -80,7 +81,7 @@ const settings = definePluginSettings({
     audioSource: {
         type: OptionType.STRING,
         description: "What to listen to: discord, system, or mic",
-        default: "discord"
+        default: "system"
     },
     advancedOpen: {
         type: OptionType.BOOLEAN,
@@ -183,7 +184,7 @@ function sourceHint(source: Engine.AudioSource) {
         case "discord":
             return "Discord voice through system audio, so calls are picked up even when the window itself is silent.";
         case "system":
-            return "All PC audio: Discord, games, browsers, and other apps.";
+            return "Hears everyone through your speakers or headset, then waits for the full sentence before translating.";
         case "mic":
             return "Your microphone only.";
         default: {
@@ -423,7 +424,7 @@ function wireOverlay(el: HTMLElement) {
             e.stopPropagation();
             if (e.button !== 0 && e.pointerType === "mouse") return;
             e.preventDefault();
-            const act = btn.dataset.act;
+            const { act } = btn.dataset;
             if (act === "hide") hideToggle();
             else if (act === "clear") clearNow();
             else if (act === "listen") listenToggle();
@@ -1004,15 +1005,27 @@ function makeResizable(box: HTMLElement, signal: AbortSignal) {
     box.addEventListener("pointercancel", endResize, { signal });
 }
 
+const SYSTEM_LISTEN_KEY = "LiveVoiceTranslateSystemListen";
+
+async function useSystemListen() {
+    try {
+        if (await DataStore.get(SYSTEM_LISTEN_KEY)) return;
+        if (settings.store.audioSource !== "mic")
+            settings.store.audioSource = "system";
+        await DataStore.set(SYSTEM_LISTEN_KEY, true);
+    } catch { /* keep the saved source */ }
+}
+
 export default definePlugin({
     name: "LiveVoiceTranslate",
-    description: "Listen to Discord, system audio, or your mic and translate speech as it happens. Uses a low-cost OpenRouter speech model.",
+    description: "Hears other people through system audio and translates the full sentence. Built for accuracy, not speed.",
     tags: ["Voice", "Utility"],
     searchTerms: ["translate", "speech", "caption", "openai", "tagalog", "delexo"],
     authors: [Delexo],
     settings,
     managedStyle,
     async start() {
+        await useSystemListen();
         await Engine.loadPersistedHistory();
         if (settings.store.showOverlay) mount();
     },

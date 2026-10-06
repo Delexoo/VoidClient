@@ -8,10 +8,9 @@ import * as DataStore from "@api/DataStore";
 import { getOpenRouterKey } from "@utils/openRouterKey";
 import { PluginNative } from "@utils/types";
 
-import { isJunkTranscript, normalizeLangCode, sameSpokenText } from "../_delexo/langNames";
+import { isJunkTranscript, languageName, normalizeLangCode, sameSpokenText } from "../_delexo/langNames";
 import { activeSpeakerName, localTalker, rankedSpeakers } from "../_delexo/ultraVoiceOverlay";
-import { STT_MODEL, transcribeOpenRouter } from "./openrouter";
-import { googleTranslate } from "./translate";
+import { listenAndTranslate } from "./openrouter";
 
 const Native = VencordNative.pluginHelpers.LiveVoiceTranslate as PluginNative<typeof import("./native")> | undefined;
 
@@ -20,14 +19,14 @@ const MAX_HISTORY = 40;
 const TARGET_SR = 16000;
 const SPEECH_RMS = 0.0032;
 const SYSTEM_SPEECH_RMS = 0.0032;
-const SILENCE_MS = 1700;
-const MIN_SPEECH_MS = 420;
-const SYSTEM_MIN_SPEECH_MS = 420;
-const MAX_UTTER_MS = 14000;
+const SILENCE_MS = 2800;
+const MIN_SPEECH_MS = 900;
+const SYSTEM_MIN_SPEECH_MS = 900;
+const MAX_UTTER_MS = 28000;
 const PREROLL_CHUNKS = 14;
 const MIN_UTTER_RMS = 0.0016;
 const SYSTEM_MIN_UTTER_RMS = 0.0016;
-const MIN_UTTER_SEC = 0.5;
+const MIN_UTTER_SEC = 0.9;
 
 export type HistoryRow = { original: string; translation: string; fromLang?: string; toLang?: string; speaker?: string; };
 
@@ -55,8 +54,7 @@ export type AudioSource = "discord" | "system" | "mic";
 let fromLang = "auto";
 let toLang = "en";
 let apiKey = "";
-let model: typeof STT_MODEL = STT_MODEL;
-let audioSource: AudioSource = "discord";
+let audioSource: AudioSource = "system";
 let listening = false;
 let ready = false;
 let status = "Ready";
@@ -212,7 +210,7 @@ export async function loadApiKeyFromEnv() {
 }
 
 export function setModel() {
-    model = STT_MODEL;
+    // The listener chooses a quality model on its own.
 }
 
 export function parseAudioSource(value: string): AudioSource {
@@ -222,7 +220,7 @@ export function parseAudioSource(value: string): AudioSource {
         case "mic":
             return value;
         default:
-            return "discord";
+            return "system";
     }
 }
 
@@ -364,14 +362,11 @@ function considerSpeaker(now: number): string | null {
         return null;
     }
     const needed = hit.id === SYSTEM_ID ? 1100 : 850;
-    if (held < needed || !pcmBuf.length) return null;
-
-    const labeled = winningSpeaker();
+    if (held < needed) return null;
     utteranceId = hit.id;
     utteranceSpeaker = hit.name;
-    speakerVotes.set(hit.name, 1);
     seenSince = now;
-    return labeled;
+    return null;
 }
 
 function stopTracks() {
@@ -626,7 +621,7 @@ function listenStatus() {
         case "discord":
             return "OpenRouter listening to Discord";
         case "system":
-            return "OpenRouter listening to system audio";
+            return "Listening to system audio";
         case "mic":
             return "OpenRouter listening to microphone";
         default: {
@@ -662,7 +657,7 @@ async function transcribeJob(job: UtterJob) {
     }
     busyTranscribe = true;
     partial = true;
-    setStatus("Transcribing… this can take a few seconds");
+    setStatus("Transcribing the full sentence…");
     try {
         if (!apiKey) await loadApiKeyFromEnv();
         if (!apiKey) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
@@ -680,23 +675,17 @@ async function transcribeJob(job: UtterJob) {
             return;
         }
         const pcm16 = downsampleTo16k(merged, job.rate);
-        const heard = await transcribeOpenRouter(pcm16, TARGET_SR, apiKey, model, fromLang);
-        const text = heard.text.trim();
+        const targetName = languageName(toLang) || "English";
+        const sourceName = fromLang && fromLang !== "auto" ? languageName(fromLang) : "";
+        const heard = await listenAndTranslate(pcm16, TARGET_SR, apiKey, targetName, sourceName);
+        const text = heard.transcript.trim();
         if (!text || isJunkTranscript(text) || sameSpokenText(text, lastOriginal) || sameSpokenText(text, lastTranslation)) {
             if (listening) setStatus(idleStatus());
             return;
         }
         lastOriginal = text;
-        lastTranslation = text;
-        let spokenLang = "";
-        setStatus("Translating…");
-        try {
-            const tr = await googleTranslate(text, "auto", toLang);
-            lastTranslation = (tr.text || text).trim() || text;
-            spokenLang = normalizeLangCode(tr.sourceLanguage) || spokenLang;
-        } catch {
-            lastTranslation = text;
-        }
+        lastTranslation = (heard.translation || text).trim() || text;
+        let spokenLang = normalizeLangCode(heard.language);
         if (sameSpokenText(text, lastTranslation))
             spokenLang = normalizeLangCode(toLang) || spokenLang;
         if (isJunkTranscript(lastTranslation)) {
@@ -789,12 +778,7 @@ function onPcmFrame(input: Float32Array) {
 
     if (loud) {
         lastLoudAt = now;
-        const previous = considerSpeaker(now);
-        if (previous) {
-            enqueueCurrent(true, previous);
-            preroll = [];
-            inSpeech = false;
-        }
+        considerSpeaker(now);
         const frame = new Float32Array(input);
         if (!inSpeech) {
             inSpeech = true;

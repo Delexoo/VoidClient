@@ -8,7 +8,7 @@ import { PluginNative } from "@utils/types";
 
 import { encodeWav } from "./wav";
 
-export const STT_MODEL = "openai/gpt-4o-mini-transcribe";
+export const STT_MODEL = "openai/gpt-4o-transcribe";
 export type OpenRouterSttModel = typeof STT_MODEL;
 
 const Native = VencordNative.pluginHelpers.LiveVoiceTranslate as PluginNative<typeof import("./native")> | undefined;
@@ -35,7 +35,7 @@ export async function transcribeOpenRouter(
 ): Promise<{ text: string; }> {
     const key = apiKey.trim();
     if (!key) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
-    if (samples.length < sampleRate * 0.4) return { text: "" };
+    if (samples.length < sampleRate * 0.8) return { text: "" };
     if (!Native?.transcribeOpenRouter)
         throw new Error("Restart Discord from the tray so OpenRouter can run.");
 
@@ -43,4 +43,28 @@ export async function transcribeOpenRouter(
     const res = await Native.transcribeOpenRouter(key, model, toBase64(wav), openaiLang(language));
     if (!res?.ok) throw new Error(String(res?.data || "OpenRouter failed").slice(0, 140));
     return { text: String(res.data || "").trim() };
+}
+
+export async function listenAndTranslate(
+    samples: Float32Array,
+    sampleRate: number,
+    apiKey: string,
+    targetName: string,
+    sourceName: string
+): Promise<{ transcript: string; translation: string; language: string; }> {
+    const key = apiKey.trim();
+    if (!key) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
+    if (samples.length < sampleRate * 0.8) return { transcript: "", translation: "", language: "" };
+    if (!Native?.listenQuality)
+        throw new Error("Restart Discord from the tray so the quality listener can run.");
+
+    const wav = encodeWav(samples, sampleRate);
+    const res = await Native.listenQuality(key, toBase64(wav), targetName, sourceName);
+    if (!res?.ok) throw new Error(String(res?.data || "OpenRouter failed").slice(0, 140));
+    const { data } = res;
+    return {
+        transcript: String(data?.transcript || "").trim(),
+        translation: String(data?.translation || "").trim(),
+        language: String(data?.language || "").trim()
+    };
 }

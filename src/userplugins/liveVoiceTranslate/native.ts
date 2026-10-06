@@ -145,7 +145,7 @@ export async function transcribeOpenRouter(
 
     const bytes = Buffer.from(audioBase64, "base64");
     const lang = String(language || "").trim();
-    const modelId = model || "openai/gpt-4o-mini-transcribe";
+    const modelId = model || "openai/gpt-4o-transcribe";
     const headers = {
         Authorization: `Bearer ${key}`,
         "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
@@ -203,5 +203,214 @@ export async function transcribeOpenRouter(
         if (/failed to fetch|networkerror|enotfound|econnreset/i.test(msg))
             return { ok: false, data: "Can't reach OpenRouter. Check your internet, then fully quit Discord from the tray and reopen." };
         return { ok: false, data: msg.slice(0, 160) };
+    }
+}
+
+const QUALITY_LISTEN_MODEL = "google/gemini-2.5-pro";
+const QUALITY_STT_MODEL = "openai/gpt-4o-transcribe";
+
+function chatHeaders(key: string) {
+    return {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
+        "X-OpenRouter-Title": "LiveVoiceTranslate"
+    };
+}
+
+function apiDetail(status: number, raw: string) {
+    try {
+        const err = JSON.parse(raw) as { error?: { message?: string; }; message?: string; };
+        return String(err?.error?.message || err?.message || `OpenRouter ${status}`).slice(0, 180);
+    } catch {
+        return `OpenRouter ${status}`;
+    }
+}
+
+function contentFromChat(raw: string) {
+    const data = JSON.parse(raw) as {
+        choices?: Array<{ message?: { content?: string | Array<{ text?: string; }>; }; }>;
+        error?: { message?: string; };
+    };
+    if (data?.error?.message) throw new Error(data.error.message);
+    const content = data?.choices?.[0]?.message?.content;
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) return content.map(part => part?.text || "").join("");
+    return "";
+}
+
+function languageCode(raw: string) {
+    const value = raw.trim().toLowerCase();
+    const names: Record<string, string> = {
+        english: "en",
+        tagalog: "tl",
+        filipino: "tl",
+        spanish: "es",
+        french: "fr",
+        german: "de",
+        chinese: "zh",
+        japanese: "ja",
+        korean: "ko",
+        indonesian: "id",
+        portuguese: "pt",
+        italian: "it",
+        russian: "ru",
+        vietnamese: "vi",
+        thai: "th",
+        arabic: "ar",
+        hindi: "hi"
+    };
+    if (names[value]) return names[value];
+    if (/^[a-z]{2,3}(-[a-z]{2})?$/.test(value)) return value.split("-")[0];
+    return "";
+}
+
+function parseListen(raw: string) {
+    let out = String(raw || "").trim();
+    if (out.startsWith("```"))
+        out = out.replace(/^```(?:json|JSON)?\s*/, "").replace(/\s*```$/, "").trim();
+    const start = out.indexOf("{");
+    const end = out.lastIndexOf("}");
+    if (start < 0 || end <= start) return null;
+    try {
+        const data = JSON.parse(out.slice(start, end + 1)) as {
+            transcript?: string;
+            translation?: string;
+            text?: string;
+            language?: string;
+            from?: string;
+        };
+        const transcript = String(data.transcript ?? "").trim();
+        const translation = String(data.translation ?? data.text ?? "").trim();
+        const language = languageCode(String(data.language ?? data.from ?? ""));
+        if (!transcript && !translation)
+            return { transcript: "", translation: "", language };
+        return {
+            transcript: transcript || translation,
+            translation: translation || transcript,
+            language
+        };
+    } catch {
+        return null;
+    }
+}
+
+function listenPrompt(targetName: string, sourceName: string) {
+    return [
+        "Listen to the whole clip before you answer. Accuracy matters more than speed.",
+        "Write every spoken word verbatim, including code-switching. Keep names as spoken.",
+        "Ignore music, noise, and silence. Do not invent words, captions, or filler.",
+        "If you cannot hear speech, return empty strings.",
+        sourceName
+            ? `The speech may be ${sourceName}, but trust only what you actually hear.`
+            : "Detect the spoken language from the audio.",
+        `Translate the full utterance into ${targetName}.`,
+        `If the speech is already ${targetName}, set translation to the same words as transcript.`,
+        "Reply with JSON only, with keys transcript, translation, and language.",
+        "language is a short code such as en, tl, es, or ja."
+    ].join(" ");
+}
+
+async function chatAudio(key: string, model: string, prompt: string, audioBase64: string) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: chatHeaders(key),
+        signal: AbortSignal.timeout(90000),
+        body: JSON.stringify({
+            model,
+            temperature: 0,
+            max_tokens: 2048,
+            messages: [
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: prompt },
+                        { type: "input_audio", input_audio: { data: audioBase64, format: "wav" } }
+                    ]
+                }
+            ]
+        })
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(apiDetail(res.status, raw));
+    return contentFromChat(raw);
+}
+
+async function chatText(key: string, model: string, prompt: string) {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: chatHeaders(key),
+        signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({
+            model,
+            temperature: 0,
+            max_tokens: 2048,
+            messages: [{ role: "user", content: prompt }]
+        })
+    });
+    const raw = await res.text();
+    if (!res.ok) throw new Error(apiDetail(res.status, raw));
+    return contentFromChat(raw);
+}
+
+export async function listenQuality(
+    event: IpcMainInvokeEvent,
+    apiKey: string,
+    audioBase64: string,
+    targetName: string,
+    sourceName: string
+) {
+    const key = String(apiKey || "").trim() || envValue("OPENROUTER_API_KEY");
+    if (!key)
+        return { ok: false as const, data: "Paste an OpenRouter key at the top of the Plugins page." };
+    if (!audioBase64)
+        return { ok: false as const, data: "No audio to transcribe." };
+
+    const target = String(targetName || "English").trim() || "English";
+    const source = String(sourceName || "").trim();
+    const prompt = listenPrompt(target, source);
+
+    try {
+        const raw = await chatAudio(key, QUALITY_LISTEN_MODEL, prompt, audioBase64);
+        const parsed = parseListen(raw);
+        if (parsed)
+            return { ok: true as const, data: parsed };
+    } catch (e) {
+        const message = String(e).replace(/^Error:\s*/, "");
+        if (/failed to fetch|networkerror|enotfound|econnreset/i.test(message))
+            return { ok: false as const, data: "Can't reach OpenRouter. Check your internet, then fully quit Discord from the tray and reopen." };
+    }
+
+    const heard = await transcribeOpenRouter(event, key, QUALITY_STT_MODEL, audioBase64, "");
+    if (!heard.ok || !String(heard.data || "").trim())
+        return { ok: false as const, data: heard.ok ? "Couldn't hear speech in that clip." : String(heard.data) };
+
+    const transcript = String(heard.data).trim();
+    try {
+        const raw = await chatText(
+            key,
+            QUALITY_LISTEN_MODEL,
+            [
+                `Translate this transcript into ${target}. Keep names.`,
+                `If it is already ${target}, copy it unchanged.`,
+                "Do not add words that are not in the transcript.",
+                "Reply with JSON only, with keys translation and language.",
+                `Transcript: ${transcript}`
+            ].join(" ")
+        );
+        const parsed = parseListen(raw);
+        return {
+            ok: true as const,
+            data: {
+                transcript,
+                translation: parsed?.translation || transcript,
+                language: parsed?.language || ""
+            }
+        };
+    } catch {
+        return {
+            ok: true as const,
+            data: { transcript, translation: transcript, language: "" }
+        };
     }
 }
