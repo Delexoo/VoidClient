@@ -13,17 +13,24 @@ import { showToast, Toasts, useEffect, useRef } from "@webpack/common";
 const busy = new Set<string>();
 const cache = new Map<string, TranslationValue>();
 
-function messageIdFrom(host: HTMLElement) {
+function messagePlace(host: HTMLElement) {
     const row = host.closest("[id^='chat-messages-']");
-    const rowId = row?.id.match(/^chat-messages-\d+-(\d+)$/)?.[1];
-    if (rowId) return rowId;
+    const rowMatch = row?.id.match(/^chat-messages-(\d+)-(\d+)$/);
+    if (rowMatch) return { channelId: rowMatch[1], messageId: rowMatch[2] };
 
     const accessories = host.closest("[id^='message-accessories-']");
     const accessoryId = accessories?.id.slice("message-accessories-".length) || "";
-    return /^\d+$/.test(accessoryId) ? accessoryId : "";
+    return { channelId: undefined, messageId: /^\d+$/.test(accessoryId) ? accessoryId : "" };
 }
 
-async function runMediaTranslation(messageId: string, src: string, kind: "audio" | "video", fallbackUrl?: string, alsoText?: string) {
+async function runMediaTranslation(
+    messageId: string,
+    src: string,
+    kind: "audio" | "video",
+    fallbackUrl?: string,
+    alsoText?: string,
+    channelId?: string
+) {
     const saved = cache.get(messageId);
     if (saved) {
         handleTranslate(messageId, saved);
@@ -35,13 +42,13 @@ async function runMediaTranslation(messageId: string, src: string, kind: "audio"
     const stamp = translationEpoch(messageId);
     handleTranslate(messageId, { sourceLanguage: kind, text: "Listening…" });
     try {
-        const spoken = await translateMedia(src, kind, fallbackUrl);
+        const spoken = await translateMedia(src, kind, fallbackUrl, { channelId, messageId });
         if (translationEpoch(messageId) !== stamp) return;
         let { text } = spoken;
         let { sourceLanguage } = spoken;
         if (alsoText) {
             try {
-                const written = await translate("received", alsoText);
+                const written = await translate("received", alsoText, { channelId, messageId });
                 if (written.text && written.text !== text)
                     text = text ? `${text}\n\n${written.text}` : written.text;
                 if (!sourceLanguage) sourceLanguage = written.sourceLanguage;
@@ -63,18 +70,18 @@ export async function translateMessage(message: Message) {
     const media = findMessageMedia(message);
     const content = getMessageContent(message);
     if (media) {
-        await runMediaTranslation(message.id, media.url, media.kind, media.fallbackUrl, content);
+        await runMediaTranslation(message.id, media.url, media.kind, media.fallbackUrl, content, message.channel_id);
         return;
     }
     if (!content) return;
-    const trans = await translate("received", content);
+    const trans = await translate("received", content, { channelId: message.channel_id, messageId: message.id });
     handleTranslate(message.id, trans);
 }
 
 export async function onVoiceHover(src: string, host: HTMLElement) {
-    const messageId = messageIdFrom(host);
-    if (!messageId) return;
-    await runMediaTranslation(messageId, src, "audio");
+    const place = messagePlace(host);
+    if (!place.messageId) return;
+    await runMediaTranslation(place.messageId, src, "audio", undefined, undefined, place.channelId);
 }
 
 function VoiceHoverAnchor({ src }: { src?: string; }) {

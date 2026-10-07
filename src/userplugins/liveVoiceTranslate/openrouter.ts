@@ -50,7 +50,8 @@ export async function listenAndTranslate(
     sampleRate: number,
     apiKey: string,
     targetName: string,
-    sourceName: string
+    sourceName: string,
+    context = ""
 ): Promise<{ transcript: string; translation: string; language: string; }> {
     const key = apiKey.trim();
     if (!key) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
@@ -59,7 +60,7 @@ export async function listenAndTranslate(
         throw new Error("Restart Discord from the tray so the quality listener can run.");
 
     const wav = encodeWav(samples, sampleRate);
-    const res = await Native.listenQuality(key, toBase64(wav), targetName, sourceName);
+    const res = await Native.listenQuality(key, toBase64(wav), targetName, sourceName, context);
     if (!res?.ok) throw new Error(String(res?.data || "OpenRouter failed").slice(0, 140));
     const { data } = res;
     return {

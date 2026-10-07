@@ -4,12 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { PluginNative } from "@utils/types";
+import { translationModel } from "@plugins/translate/settings";
+import { chatContextBlock } from "@utils/chatContext";
 import { getOpenRouterKey } from "@utils/openRouterKey";
+import { PluginNative } from "@utils/types";
 import { ComponentDispatch, DraftStore, DraftType } from "@webpack/common";
 
 import { languageName } from "./languages";
-import { DEFAULT_MODEL, settings } from "./settings";
+import { settings } from "./settings";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -21,7 +23,8 @@ function nativeApi() {
 function systemPrompt(targetLang: string) {
     const name = languageName(targetLang);
     return [
-        `You are a professional translator. Translate the user's Discord message into ${name}.`,
+        `You are a professional translator. Translate the user's Discord message into ${name}. Accuracy matters more than speed.`,
+        "Nearby messages are context only. Translate only the draft after \"Translate only this message\".",
         "Return only the translated message. No quotes, labels, romanization, or commentary.",
         "Preserve Discord markdown, mentions (<@id>, <#id>, <@&id>), custom emojis (<:name:id> and <a:name:id>), timestamps (<t:...>), and URLs exactly.",
         "Keep code blocks and inline code unchanged.",
@@ -72,7 +75,9 @@ async function chatComplete(system: string, user: string) {
     const apiKey = resolveKey();
     if (!apiKey) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
 
-    const model = String(settings.store.model || "").trim() || DEFAULT_MODEL;
+    const model = translationModel(settings.store.model, value => {
+        settings.store.model = value;
+    });
     const Native = nativeApi();
     if (Native?.chatComplete) {
         const res = await Native.chatComplete(apiKey, model, system, user);
@@ -90,7 +95,7 @@ async function chatComplete(system: string, user: string) {
         },
         body: JSON.stringify({
             model,
-            temperature: 0.2,
+            temperature: 0,
             max_tokens: 4096,
             messages: [
                 { role: "system", content: system },
@@ -133,7 +138,9 @@ export async function translateComposer(channelId: string) {
     if (!source) throw new Error("Type a message first.");
 
     const targetLang = String(settings.store.targetLang || "tl").trim() || "tl";
-    const raw = await chatComplete(systemPrompt(targetLang), source);
+    const context = chatContextBlock(channelId);
+    const asked = context ? `${context}\n\nTranslate only this message:\n${source}` : source;
+    const raw = await chatComplete(systemPrompt(targetLang), asked);
     const translated = cleanTranslation(raw);
     if (!translated) throw new Error("OpenRouter returned an empty translation.");
     setComposerText(translated);

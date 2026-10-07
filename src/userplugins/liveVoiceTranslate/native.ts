@@ -295,7 +295,7 @@ function parseListen(raw: string) {
     }
 }
 
-function listenPrompt(targetName: string, sourceName: string) {
+function listenPrompt(targetName: string, sourceName: string, context: string) {
     return [
         "Listen to the whole clip before you answer. Accuracy matters more than speed.",
         "Write every spoken word verbatim, including code-switching. Keep names as spoken.",
@@ -307,8 +307,11 @@ function listenPrompt(targetName: string, sourceName: string) {
         `Translate the full utterance into ${targetName}.`,
         `If the speech is already ${targetName}, set translation to the same words as transcript.`,
         "Reply with JSON only, with keys transcript, translation, and language.",
-        "language is a short code such as en, tl, es, or ja."
-    ].join(" ");
+        "language is a short code such as en, tl, es, or ja.",
+        context
+            ? `Use this chat only to understand names and meaning. Do not translate it.\n${context}`
+            : ""
+    ].filter(Boolean).join(" ");
 }
 
 async function chatAudio(key: string, model: string, prompt: string, audioBase64: string) {
@@ -358,7 +361,8 @@ export async function listenQuality(
     apiKey: string,
     audioBase64: string,
     targetName: string,
-    sourceName: string
+    sourceName: string,
+    context?: string
 ) {
     const key = String(apiKey || "").trim() || envValue("OPENROUTER_API_KEY");
     if (!key)
@@ -368,7 +372,7 @@ export async function listenQuality(
 
     const target = String(targetName || "English").trim() || "English";
     const source = String(sourceName || "").trim();
-    const prompt = listenPrompt(target, source);
+    const prompt = listenPrompt(target, source, String(context || "").trim());
 
     try {
         const raw = await chatAudio(key, QUALITY_LISTEN_MODEL, prompt, audioBase64);
@@ -395,8 +399,11 @@ export async function listenQuality(
                 `If it is already ${target}, copy it unchanged.`,
                 "Do not add words that are not in the transcript.",
                 "Reply with JSON only, with keys translation and language.",
+                String(context || "").trim()
+                    ? `Chat context, do not translate it:\n${String(context).trim()}`
+                    : "",
                 `Transcript: ${transcript}`
-            ].join(" ")
+            ].filter(Boolean).join(" ")
         );
         const parsed = parseListen(raw);
         return {

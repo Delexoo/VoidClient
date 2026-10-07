@@ -17,7 +17,8 @@
 */
 
 import { GoogleLanguages } from "@plugins/translate/languages";
-import { DEFAULT_MODEL, settings } from "@plugins/translate/settings";
+import { DEFAULT_MODEL, settings, translationModel } from "@plugins/translate/settings";
+import { chatContextBlock } from "@utils/chatContext";
 import { classNameFactory } from "@utils/css";
 import { getOpenRouterKey } from "@utils/openRouterKey";
 import { PluginNative } from "@utils/types";
@@ -110,12 +111,29 @@ function resolveOpenRouterKey() {
     return getOpenRouterKey();
 }
 
-export async function translate(kind: "received" | "sent", text: string): Promise<TranslationValue> {
+function accurateModel() {
+    return translationModel(settings.store.openrouterModel, value => {
+        settings.store.openrouterModel = value;
+    });
+}
+
+function withChatContext(body: string, channelId?: string, messageId?: string) {
+    const context = chatContextBlock(channelId, messageId);
+    if (!context) return body;
+    return `${context}\n\nTranslate only this message:\n${body}`;
+}
+
+export async function translate(
+    kind: "received" | "sent",
+    text: string,
+    where?: { channelId?: string; messageId?: string; }
+): Promise<TranslationValue> {
     try {
         return await openRouterTranslate(
             text,
             settings.store[`${kind}Input`],
-            settings.store[`${kind}Output`]
+            settings.store[`${kind}Output`],
+            where
         );
     } catch (e) {
         const userMessage = typeof e === "string"
@@ -139,8 +157,7 @@ function parseApiError(status: number, raw: string) {
     }
 }
 
-const VOICE_MODEL = "google/gemini-2.5-flash";
-const MEDIA_FALLBACK_MODEL = "google/gemini-2.5-pro";
+const LAST_RESORT_MODEL = "google/gemini-2.5-flash";
 const AUDIO_BYTE_LIMIT = 15_000_000;
 const VIDEO_BYTE_LIMIT = 20_000_000;
 
@@ -246,7 +263,7 @@ async function callOpenRouterAudio(apiKey: string, model: string, prompt: string
         },
         body: JSON.stringify({
             model,
-            temperature: 0.1,
+            temperature: 0,
             max_tokens: 2048,
             messages: [
                 {
@@ -270,6 +287,18 @@ async function loadBlob(url: string) {
     const blob = await res.blob();
     if (!blob.size) throw "That file was empty.";
     return blob;
+}
+
+async function hear(call: (model: string) => Promise<string>) {
+    const primary = accurateModel();
+    try {
+        return await call(primary);
+    } catch (first) {
+        const message = String(first);
+        if (!/audio|video|modality|unsupported|invalid|format|file/i.test(message)) throw first;
+        if (primary !== DEFAULT_MODEL) return await call(DEFAULT_MODEL);
+        return await call(LAST_RESORT_MODEL);
+    }
 }
 
 function mediaPrompt(kind: "audio" | "video", targetName: string) {
@@ -325,7 +354,12 @@ export async function translateVoice(src: string): Promise<TranslationValue> {
     return translateMedia(src, "audio");
 }
 
-export async function translateMedia(src: string, kind: "audio" | "video", fallbackUrl?: string): Promise<TranslationValue> {
+export async function translateMedia(
+    src: string,
+    kind: "audio" | "video",
+    fallbackUrl?: string,
+    where?: { channelId?: string; messageId?: string; }
+): Promise<TranslationValue> {
     const apiKey = resolveOpenRouterKey();
     if (!apiKey) throw "Paste an OpenRouter key at the top of the Plugins page.";
 
@@ -345,7 +379,8 @@ export async function translateMedia(src: string, kind: "audio" | "video", fallb
 
     const targetCode = settings.store.receivedOutput || "en";
     const targetName = languageName(targetCode === "auto" ? "en" : targetCode);
-    const prompt = mediaPrompt(kind, targetName);
+    const context = chatContextBlock(where?.channelId, where?.messageId);
+    const prompt = context ? `${mediaPrompt(kind, targetName)}\n\n${context}` : mediaPrompt(kind, targetName);
 
     let raw = "";
     if (kind === "audio") {
@@ -358,28 +393,16 @@ export async function translateMedia(src: string, kind: "audio" | "video", fallb
             wav = new Uint8Array(await blob.arrayBuffer());
         }
         const audioBase64 = bytesToBase64(wav);
-        try {
-            raw = await callOpenRouterAudio(apiKey, VOICE_MODEL, prompt, audioBase64, format);
-        } catch (first) {
-            const message = String(first);
-            if (!/audio|modality|unsupported|invalid|format/i.test(message)) throw first;
-            raw = await callOpenRouterAudio(apiKey, MEDIA_FALLBACK_MODEL, prompt, audioBase64, format);
-        }
+        raw = await hear(model => callOpenRouterAudio(apiKey, model, prompt, audioBase64, format));
     } else {
         const mime = blob.type || "video/mp4";
         const videoBase64 = bytesToBase64(new Uint8Array(await blob.arrayBuffer()));
         try {
-            raw = await callOpenRouterVideo(apiKey, VOICE_MODEL, prompt, mime, videoBase64);
+            raw = await hear(model => callOpenRouterVideo(apiKey, model, prompt, mime, videoBase64));
         } catch (first) {
-            const message = String(first);
-            if (!/video|modality|unsupported|invalid|format|file/i.test(message)) throw first;
-            try {
-                raw = await callOpenRouterVideo(apiKey, MEDIA_FALLBACK_MODEL, prompt, mime, videoBase64);
-            } catch {
-                const wav = await audioToWav(blob).catch(() => null);
-                if (!wav) throw first;
-                raw = await callOpenRouterAudio(apiKey, MEDIA_FALLBACK_MODEL, prompt, bytesToBase64(wav), "wav");
-            }
+            const wav = await audioToWav(blob).catch(() => null);
+            if (!wav) throw first;
+            raw = await hear(model => callOpenRouterAudio(apiKey, model, prompt, bytesToBase64(wav), "wav"));
         }
     }
 
@@ -461,7 +484,7 @@ async function callOpenRouter(apiKey: string, model: string, system: string, tex
         },
         body: JSON.stringify({
             model,
-            temperature: 0.1,
+            temperature: 0,
             max_tokens: 4096,
             messages: [
                 { role: "system", content: system },
@@ -474,18 +497,26 @@ async function callOpenRouter(apiKey: string, model: string, system: string, tex
     return contentFromResponse(body);
 }
 
-async function openRouterTranslate(text: string, sourceLang: string, targetLang: string): Promise<TranslationValue> {
+async function openRouterTranslate(
+    text: string,
+    sourceLang: string,
+    targetLang: string,
+    where?: { channelId?: string; messageId?: string; }
+): Promise<TranslationValue> {
     const apiKey = resolveOpenRouterKey();
     if (!apiKey)
         throw "Paste an OpenRouter key at the top of the Plugins page.";
 
-    const model = String(settings.store.openrouterModel || "").trim() || DEFAULT_MODEL;
+    const model = accurateModel();
     const targetName = languageName(targetLang === "auto" ? "en" : targetLang);
     const sourceName = languageName(sourceLang);
+    const asked = withChatContext(text, where?.channelId, where?.messageId);
     const system = [
-        "You are a professional translator for Discord chat.",
+        "You are a professional translator for Discord chat. Accuracy matters more than speed.",
         `Translate the user's message into ${targetName}.`,
         sourceLang && sourceLang !== "auto" ? `The source language is ${sourceName}.` : "Detect the source language.",
+        "If nearby messages are included, use them only to resolve names, slang, and what this or that refers to.",
+        "Translate only the message after \"Translate only this message\".",
         `The "text" field MUST be ${targetName}, never a copy of the original unless the original is already ${targetName}.`,
         "Translate slang, abbreviations, swearing, and informal chat into natural wording in the target language.",
         "Preserve Discord markdown, mentions, custom emojis, timestamps, URLs, and code exactly.",
@@ -493,7 +524,7 @@ async function openRouterTranslate(text: string, sourceLang: string, targetLang:
         'Return ONLY JSON: {"from":"<English name of the source language, for example Tagalog>","text":"<the translation in the target language>"}'
     ].join(" ");
 
-    let raw = await callOpenRouter(apiKey, model, system, text);
+    let raw = await callOpenRouter(apiKey, model, system, asked);
     let translated = parseModelOutput(raw, sourceLang === "auto" ? "detected language" : sourceName);
     if (!translated.text) throw "OpenRouter returned an empty translation.";
 
@@ -507,7 +538,7 @@ async function openRouterTranslate(text: string, sourceLang: string, targetLang:
                 "Slang and abbreviations must become clear natural wording.",
                 'Return ONLY JSON: {"from":"<source language name>","text":"<translation>"}'
             ].join(" "),
-            text
+            withChatContext(text, where?.channelId, where?.messageId)
         );
         const retry = parseModelOutput(raw, translated.sourceLanguage);
         if (retry.text && !sameMessage(retry.text, text)) translated = retry;

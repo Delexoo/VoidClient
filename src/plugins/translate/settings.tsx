@@ -18,11 +18,24 @@
 
 import { definePluginSettings } from "@api/Settings";
 import { Button } from "@components/Button";
+import { openTranslateModal } from "@plugins/translate/TranslateModal";
 import { OptionType } from "@utils/types";
 
-import { openTranslateModal } from "./TranslateModal";
+export const DEFAULT_MODEL = "google/gemini-2.5-pro";
+const REPLACED_MODELS = new Set([
+    "google/gemini-2.5-flash-lite",
+    "google/gemini-2.5-flash",
+    "google/gemini-flash-1.5"
+]);
 
-export const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
+export function translationModel(stored: string | undefined, persist?: (model: string) => void) {
+    const model = String(stored || "").trim();
+    if (!model || REPLACED_MODELS.has(model)) {
+        persist?.(DEFAULT_MODEL);
+        return DEFAULT_MODEL;
+    }
+    return model;
+}
 
 export const settings = definePluginSettings({
     receivedInput: {
@@ -52,9 +65,27 @@ export const settings = definePluginSettings({
     openrouterModel: {
         type: OptionType.STRING,
         displayName: "OpenRouter model",
-        description: "OpenRouter model ID. Default is google/gemini-2.5-flash-lite.",
+        description: "Used for text, voice, audio, and video. Default is Gemini 2.5 Pro, chosen for accuracy.",
         placeholder: DEFAULT_MODEL,
         default: DEFAULT_MODEL
+    },
+    useMessageContext: {
+        type: OptionType.BOOLEAN,
+        displayName: "Gather nearby messages",
+        description: "Read nearby messages before translating, so names, slang, and what this or that means come out right",
+        default: true
+    },
+    contextMessages: {
+        type: OptionType.NUMBER,
+        displayName: "Messages to gather",
+        description: "How many nearby messages to read when context is on. Use 4 to 40.",
+        default: 12,
+        disabled() { return this.store.useMessageContext === false; },
+        isValid(value) {
+            const n = Number(value);
+            if (!Number.isFinite(n) || n < 4 || n > 40) return "Use a number from 4 to 40.";
+            return true;
+        }
     },
     autoTranslate: {
         type: OptionType.BOOLEAN,

@@ -4,10 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { PluginNative } from "@utils/types";
+import { translationModel } from "@plugins/translate/settings";
+import { chatContextBlock } from "@utils/chatContext";
 import { getOpenRouterKey } from "@utils/openRouterKey";
+import { PluginNative } from "@utils/types";
 
-import { DEFAULT_MODEL, settings } from "./settings";
+import { settings } from "./settings";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -37,7 +39,9 @@ async function chatComplete(system: string, user: string) {
     const apiKey = resolveKey();
     if (!apiKey) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
 
-    const model = String(settings.store.model || "").trim() || DEFAULT_MODEL;
+    const model = translationModel(settings.store.model, value => {
+        settings.store.model = value;
+    });
     const Native = nativeApi();
     if (Native?.chatComplete) {
         const res = await Native.chatComplete(apiKey, model, system, user);
@@ -55,7 +59,7 @@ async function chatComplete(system: string, user: string) {
         },
         body: JSON.stringify({
             model,
-            temperature: 0.2,
+            temperature: 0,
             max_tokens: 4096,
             messages: [
                 { role: "system", content: system },
@@ -81,16 +85,18 @@ function clean(text: string) {
     return out;
 }
 
-export async function translateIfNotEnglish(text: string) {
+export async function translateIfNotEnglish(text: string, channelId?: string, messageId?: string) {
+    const context = chatContextBlock(channelId, messageId);
     const raw = await chatComplete(
         [
-            "You detect language and translate Discord messages into English.",
+            "You detect language and translate Discord messages into English. Accuracy matters more than speed.",
+            "Nearby messages are context only. Decide and translate only the message after \"Translate only this message\".",
             "If the message is fully English (names, slang, emojis, markdown, mentions, and English loanwords still count as English), return {\"skip\":true}.",
             "If it is not English, translate it into natural English. Slang and abbreviations must become clear English.",
             "Preserve Discord markdown, mentions, custom emojis, timestamps, URLs, and code exactly.",
             "Return ONLY JSON: {\"skip\":false,\"text\":\"<English translation>\"}."
         ].join(" "),
-        text
+        context ? `${context}\n\nTranslate only this message:\n${text}` : text
     );
     let out = String(raw || "").trim();
     if (out.startsWith("```"))

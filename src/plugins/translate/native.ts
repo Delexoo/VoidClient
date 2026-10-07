@@ -72,7 +72,7 @@ export async function makeOpenRouterAudioRequest(
             },
             body: JSON.stringify({
                 model,
-                temperature: 0.1,
+                temperature: 0,
                 max_tokens: 2048,
                 messages: [
                     {
@@ -167,7 +167,7 @@ export async function makeOpenRouterTranslateRequest(
             },
             body: JSON.stringify({
                 model,
-                temperature: 0.2,
+                temperature: 0,
                 max_tokens: 4096,
                 messages: [
                     { role: "system", content: system },

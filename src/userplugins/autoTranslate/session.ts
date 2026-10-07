@@ -156,7 +156,7 @@ async function pump() {
             const job = queue.shift()!;
             if (!stillWatching(job)) continue;
             try {
-                const translated = await translateIfNotEnglish(job.text);
+                const translated = await translateIfNotEnglish(job.text, job.channelId, job.id);
                 if (!translated || !stillWatching(job)) continue;
                 overlays.set(job.id, translated);
                 setters.get(job.id)?.(translated);

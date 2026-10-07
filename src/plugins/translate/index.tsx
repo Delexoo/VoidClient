@@ -118,7 +118,7 @@ export default definePlugin({
         }
     },
 
-    async onBeforeMessageSend(_, message) {
+    async onBeforeMessageSend(channelId, message) {
         if (!settings.store.autoTranslate) return;
         if (!message.content) return;
 
@@ -126,7 +126,7 @@ export default definePlugin({
         clearTimeout(tooltipTimeout);
         tooltipTimeout = setTimeout(() => setShouldShowTranslateEnabledTooltip?.(false), 2000);
 
-        const trans = await translate("sent", message.content);
+        const trans = await translate("sent", message.content, { channelId });
         message.content = trans.text;
     }
 });

@@ -5,6 +5,7 @@
  */
 
 import * as DataStore from "@api/DataStore";
+import { chatContextBlock } from "@utils/chatContext";
 import { getOpenRouterKey } from "@utils/openRouterKey";
 import { PluginNative } from "@utils/types";
 
@@ -677,7 +678,7 @@ async function transcribeJob(job: UtterJob) {
         const pcm16 = downsampleTo16k(merged, job.rate);
         const targetName = languageName(toLang) || "English";
         const sourceName = fromLang && fromLang !== "auto" ? languageName(fromLang) : "";
-        const heard = await listenAndTranslate(pcm16, TARGET_SR, apiKey, targetName, sourceName);
+        const heard = await listenAndTranslate(pcm16, TARGET_SR, apiKey, targetName, sourceName, chatContextBlock());
         const text = heard.transcript.trim();
         if (!text || isJunkTranscript(text) || sameSpokenText(text, lastOriginal) || sameSpokenText(text, lastTranslation)) {
             if (listening) setStatus(idleStatus());

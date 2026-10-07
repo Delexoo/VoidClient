@@ -5,24 +5,26 @@
  */
 
 import { Settings } from "@api/Settings";
-import { PluginNative } from "@utils/types";
+import { translationModel } from "@plugins/translate/settings";
+import { contextLimits } from "@utils/chatContext";
 import { getOpenRouterKey } from "@utils/openRouterKey";
+import { PluginNative } from "@utils/types";
 import { showToast, Toasts } from "@webpack/common";
 
 import { languageName } from "../composeTranslate/languages";
 import { ChatLine, collectMessages, nearbyContext } from "../quickSummary/summarize";
-import { DEFAULT_MODEL, settings } from "./settings";
 import {
+    clearOverlays,
     currentRun,
     dismissAll,
     getCachedLines,
     getCachedPrior,
     nextRun,
     patchBar,
-    clearOverlays,
     setCachedLines,
     setOverlays
 } from "./session";
+import { settings } from "./settings";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const BATCH = 28;
@@ -73,7 +75,9 @@ async function chatComplete(system: string, user: string) {
     const apiKey = resolveKey();
     if (!apiKey) throw new Error("Paste an OpenRouter key at the top of the Plugins page.");
 
-    const model = String(settings.store.model || "").trim() || DEFAULT_MODEL;
+    const model = translationModel(settings.store.model, value => {
+        settings.store.model = value;
+    });
     const Native = nativeApi();
     if (Native?.chatComplete) {
         const res = await Native.chatComplete(apiKey, model, system, user);
@@ -91,7 +95,7 @@ async function chatComplete(system: string, user: string) {
         },
         body: JSON.stringify({
             model,
-            temperature: 0.2,
+            temperature: 0,
             max_tokens: 8192,
             messages: [
                 { role: "system", content: system },
@@ -113,7 +117,9 @@ function cleanJson(raw: string) {
     return out;
 }
 
-const CONTEXT = 8;
+function contextCounts() {
+    return contextLimits() ?? { before: 0, after: 0 };
+}
 
 function spokenOnly(text: string) {
     return String(text || "").replace(/^\(re:\s*[^)]*\)\s*/i, "").trim();
@@ -140,11 +146,18 @@ function brief(line: ChatLine) {
 }
 
 function batchUser(all: ChatLine[], start: number, slice: ChatLine[]) {
-    const ctx = all.slice(Math.max(0, start - CONTEXT), start);
+    const { before: beforeCount, after: afterCount } = contextCounts();
+    const ctx = all.slice(Math.max(0, start - beforeCount), start);
+    const after = all.slice(start + slice.length, start + slice.length + afterCount);
     const parts: string[] = [];
     if (ctx.length) {
-        parts.push("Channel context (read only — do not translate these):");
+        parts.push("Messages before (read only — do not translate these):");
         parts.push(ctx.map(brief).join("\n"));
+        parts.push("");
+    }
+    if (after.length) {
+        parts.push("Messages after (read only — do not translate these):");
+        parts.push(after.map(brief).join("\n"));
         parts.push("");
     }
     parts.push("Translate ONLY the Message field of each numbered item. Do not include quoted replies or parent messages.");
@@ -161,7 +174,7 @@ function batchPrompt(lang: string) {
     const name = languageName(lang);
     return [
         `Translate Discord chat into ${name}.`,
-        "Use channel context and reply notes only to understand slang, pronouns, and what this/that refers to.",
+        "Use the messages before and after only to understand slang, pronouns, and what this or that refers to.",
         "Translate ONLY the spoken Message of each numbered item.",
         "Never copy, quote, or translate the parent/replied-to message into the output.",
         "Never prefix with (re: ...) or a quote block.",
@@ -174,12 +187,19 @@ function batchPrompt(lang: string) {
 
 async function translateOne(line: ChatLine, all: ChatLine[], lang: string) {
     const name = languageName(lang);
+    const { before: beforeCount, after: afterCount } = contextCounts();
     const idx = all.findIndex(item => item.id === line.id);
-    const ctx = idx > 0 ? all.slice(Math.max(0, idx - CONTEXT), idx) : [];
+    const ctx = idx > 0 ? all.slice(Math.max(0, idx - beforeCount), idx) : [];
+    const after = idx >= 0 ? all.slice(idx + 1, idx + 1 + afterCount) : [];
     const parts: string[] = [];
     if (ctx.length) {
-        parts.push("Channel context (do not translate):");
+        parts.push("Messages before (do not translate):");
         parts.push(ctx.map(brief).join("\n"));
+        parts.push("");
+    }
+    if (after.length) {
+        parts.push("Messages after (do not translate):");
+        parts.push(after.map(brief).join("\n"));
         parts.push("");
     }
     if (line.replyTo) parts.push(`This message is a reply to: ${line.replyTo}`);
