@@ -5,7 +5,7 @@
  */
 
 import { Message } from "@vencord/discord-types";
-import { MessageStore, SelectedChannelStore, UserStore, useEffect, useState } from "@webpack/common";
+import { MessageStore, SelectedChannelStore, useEffect, UserStore, useState } from "@webpack/common";
 
 import { translateIfNotEnglish } from "./translate";
 
