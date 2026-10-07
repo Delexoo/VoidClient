@@ -98,6 +98,57 @@ export async function makeOpenRouterAudioRequest(
     }
 }
 
+export async function makeOpenRouterVideoRequest(
+    _: IpcMainInvokeEvent,
+    apiKey: string,
+    model: string,
+    prompt: string,
+    mime: string,
+    videoBase64: string
+) {
+    const type = mime || "video/mp4";
+    const dataUrl = `data:${type};base64,${videoBase64}`;
+    const filename = type.includes("webm") ? "clip.webm" : "clip.mp4";
+    const bodies = [
+        [
+            { type: "text", text: prompt },
+            { type: "video_url", video_url: { url: dataUrl } }
+        ],
+        [
+            { type: "text", text: prompt },
+            { type: "file", file: { filename, file_data: dataUrl } }
+        ]
+    ];
+
+    let last = { status: -1, data: "Couldn't send that video." };
+    try {
+        for (const content of bodies) {
+            const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
+                    "X-OpenRouter-Title": "Translate"
+                },
+                body: JSON.stringify({
+                    model,
+                    temperature: 0,
+                    max_tokens: 2048,
+                    messages: [{ role: "user", content }]
+                })
+            });
+            const data = await res.text();
+            if (res.ok) return { status: res.status, data };
+            last = { status: res.status, data };
+            if (res.status === 401 || res.status === 402 || res.status === 429) break;
+        }
+        return last;
+    } catch (e) {
+        return { status: -1, data: String(e) };
+    }
+}
+
 export async function makeOpenRouterTranslateRequest(
     _: IpcMainInvokeEvent,
     apiKey: string,

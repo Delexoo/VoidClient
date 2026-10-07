@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
+import { TranslateIcon } from "@plugins/translate/TranslateIcon";
+import { handleTranslate, translationEpoch } from "@plugins/translate/TranslationAccessory";
+import { findMessageMedia, getMessageContent, translate, translateMedia, TranslationValue } from "@plugins/translate/utils";
+import { Message } from "@vencord/discord-types";
 import { showToast, Toasts, useEffect, useRef } from "@webpack/common";
-
-import { handleTranslate, translationEpoch } from "./TranslationAccessory";
-import { TranslationValue, translateVoice } from "./utils";
 
 const busy = new Set<string>();
 const cache = new Map<string, TranslationValue>();
@@ -22,10 +23,7 @@ function messageIdFrom(host: HTMLElement) {
     return /^\d+$/.test(accessoryId) ? accessoryId : "";
 }
 
-export async function onVoiceHover(src: string, host: HTMLElement) {
-    const messageId = messageIdFrom(host);
-    if (!messageId) return;
-
+async function runMediaTranslation(messageId: string, src: string, kind: "audio" | "video", fallbackUrl?: string, alsoText?: string) {
     const saved = cache.get(messageId);
     if (saved) {
         handleTranslate(messageId, saved);
@@ -35,23 +33,52 @@ export async function onVoiceHover(src: string, host: HTMLElement) {
 
     busy.add(messageId);
     const stamp = translationEpoch(messageId);
-    handleTranslate(messageId, { sourceLanguage: "voice", text: "Listening…" });
+    handleTranslate(messageId, { sourceLanguage: kind, text: "Listening…" });
     try {
-        const translated = await translateVoice(src);
+        const spoken = await translateMedia(src, kind, fallbackUrl);
         if (translationEpoch(messageId) !== stamp) return;
+        let { text } = spoken;
+        let { sourceLanguage } = spoken;
+        if (alsoText) {
+            try {
+                const written = await translate("received", alsoText);
+                if (written.text && written.text !== text)
+                    text = text ? `${text}\n\n${written.text}` : written.text;
+                if (!sourceLanguage) sourceLanguage = written.sourceLanguage;
+            } catch { /* the text translator already reports its own error */ }
+        }
+        const translated = { sourceLanguage, text };
         cache.set(messageId, translated);
         handleTranslate(messageId, translated);
     } catch (e) {
         handleTranslate(messageId, undefined);
-        const message = typeof e === "string" ? e : "Couldn't translate that voice message.";
+        const message = typeof e === "string" ? e : "Couldn't translate that clip.";
         showToast(message.replace(/^Error:\s*/, ""), Toasts.Type.FAILURE);
     } finally {
         busy.delete(messageId);
     }
 }
 
+export async function translateMessage(message: Message) {
+    const media = findMessageMedia(message);
+    const content = getMessageContent(message);
+    if (media) {
+        await runMediaTranslation(message.id, media.url, media.kind, media.fallbackUrl, content);
+        return;
+    }
+    if (!content) return;
+    const trans = await translate("received", content);
+    handleTranslate(message.id, trans);
+}
+
+export async function onVoiceHover(src: string, host: HTMLElement) {
+    const messageId = messageIdFrom(host);
+    if (!messageId) return;
+    await runMediaTranslation(messageId, src, "audio");
+}
+
 function VoiceHoverAnchor({ src }: { src?: string; }) {
-    const ref = useRef<HTMLSpanElement>(null);
+    const ref = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         const host = ref.current?.parentElement;
@@ -62,7 +89,22 @@ function VoiceHoverAnchor({ src }: { src?: string; }) {
         return () => host.removeEventListener("mouseenter", onEnter);
     }, [src]);
 
-    return <span ref={ref} style={{ display: "none" }} />;
+    return (
+        <button
+            ref={ref}
+            type="button"
+            className="vc-trans-voice"
+            aria-label="Translate voice message"
+            title="Translate"
+            onClick={e => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (src) void onVoiceHover(src, e.currentTarget);
+            }}
+        >
+            <TranslateIcon height={20} width={20} />
+        </button>
+    );
 }
 
 export function renderVoiceHover(props?: { src?: string; }) {

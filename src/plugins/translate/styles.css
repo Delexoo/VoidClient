@@ -38,3 +38,19 @@
 .vc-trans-chat-button {
     scale: 1.085;
 }
+
+.vc-trans-voice {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    margin-left: 4px;
+    color: var(--interactive-icon-default);
+    cursor: pointer;
+}
+
+.vc-trans-voice:hover {
+    color: var(--interactive-icon-active);
+}

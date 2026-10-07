@@ -16,50 +16,40 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-import "./styles.css";
+import "@plugins/translate/styles.css";
 
 import { findGroupChildrenByChildId, NavContextMenuPatchCallback } from "@api/ContextMenu";
+import { settings } from "@plugins/translate/settings";
+import { setShouldShowTranslateEnabledTooltip, TranslateChatBarIcon, TranslateIcon } from "@plugins/translate/TranslateIcon";
+import { clearTranslations, TranslationAccessory } from "@plugins/translate/TranslationAccessory";
+import { findMessageMedia, getMessageContent, translate } from "@plugins/translate/utils";
+import { renderVoiceHover, translateMessage } from "@plugins/translate/voiceHover";
 import { Devs } from "@utils/constants";
 import definePlugin from "@utils/types";
 import { Message } from "@vencord/discord-types";
 import { ChannelStore, Menu, SelectedChannelStore } from "@webpack/common";
 
-import { settings } from "./settings";
-import { setShouldShowTranslateEnabledTooltip, TranslateChatBarIcon, TranslateIcon } from "./TranslateIcon";
-import { clearTranslations, handleTranslate, TranslationAccessory } from "./TranslationAccessory";
-import { translate } from "./utils";
-import { renderVoiceHover } from "./voiceHover";
-
 const messageCtxPatch: NavContextMenuPatchCallback = (children, { message }: { message: Message; }) => {
     const content = getMessageContent(message);
-    if (!content) return;
+    const media = findMessageMedia(message);
+    if (!content && !media) return;
 
-    const group = findGroupChildrenByChildId("copy-text", children);
+    const group = findGroupChildrenByChildId("copy-text", children) ?? findGroupChildrenByChildId("copy-link", children);
     if (!group) return;
 
-    group.splice(group.findIndex(c => c?.props?.id === "copy-text") + 1, 0, (
+    const anchorId = group.findIndex(c => c?.props?.id === "copy-text");
+    const insertAt = anchorId >= 0 ? anchorId + 1 : group.length;
+    group.splice(insertAt, 0, (
         <Menu.MenuItem
             id="vc-trans"
-            label="Translate"
+            label={media ? (media.kind === "video" ? "Translate video" : "Translate audio") : "Translate"}
             icon={TranslateIcon}
             leadingAccessory={{ type: "icon", icon: TranslateIcon }}
-            action={async () => {
-                const trans = await translate("received", content);
-                handleTranslate(message.id, trans);
-            }}
+            action={() => void translateMessage(message)}
         />
     ));
 };
 
-
-function getMessageContent(message: Message) {
-    // Message snapshots is an array, which allows for nested snapshots, which Discord does not do yet.
-    // no point collecting content or rewriting this to render in a certain way that makes sense
-    // for something currently impossible.
-    return message.content
-        || message.messageSnapshots?.[0]?.message.content
-        || message.embeds?.find(embed => embed.type === "auto_moderation_message")?.rawDescription || "";
-}
 
 let tooltipTimeout: any;
 let openChannel: string | undefined;
@@ -67,7 +57,7 @@ let openChannel: string | undefined;
 export default definePlugin({
     name: "Translate",
     enabledByDefault: true,
-    description: "Translate messages with OpenRouter. Hover a voice message to translate what was said.",
+    description: "Translate messages, voice notes, audio files, and videos with OpenRouter.",
     tags: ["Chat", "Utility", "API Required"],
     authors: [Devs.Ven, Devs.AshtonMemer, Devs.koish1],
     settings,
@@ -115,17 +105,15 @@ export default definePlugin({
         icon: TranslateIcon,
         render(message: Message) {
             const content = getMessageContent(message);
-            if (!content) return null;
+            const media = findMessageMedia(message);
+            if (!content && !media) return null;
 
             return {
-                label: "Translate",
+                label: media ? (media.kind === "video" ? "Translate video" : "Translate audio") : "Translate",
                 icon: TranslateIcon,
                 message,
                 channel: ChannelStore.getChannel(message.channel_id),
-                onClick: async () => {
-                    const trans = await translate("received", content);
-                    handleTranslate(message.id, trans);
-                }
+                onClick: () => void translateMessage(message)
             };
         }
     },
