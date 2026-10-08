@@ -7,12 +7,12 @@
 import { definePluginSettings } from "@api/Settings";
 import { OptionType } from "@utils/types";
 
-export const DEFAULT_MODEL = "google/gemini-2.5-pro";
+export const DEFAULT_MODEL = "google/gemini-2.5-flash";
 
 export const settings = definePluginSettings({
     model: {
         type: OptionType.STRING,
-        description: "OpenRouter model ID. Default is google/gemini-2.5-pro, chosen for accuracy.",
+        description: "OpenRouter model ID. Default is google/gemini-2.5-flash so translations show quickly.",
         placeholder: DEFAULT_MODEL,
         default: DEFAULT_MODEL
     }

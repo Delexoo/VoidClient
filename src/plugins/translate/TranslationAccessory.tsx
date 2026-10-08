@@ -82,14 +82,14 @@ export function TranslationAccessory({ message }: { message: Message; }) {
 
     if (!translation?.text) return null;
 
-    const listening = translation.text === "Listening…";
+    const pending = translation.text === "Listening…" || translation.text === "Translating…";
 
     return (
         <span className={cl("accessory")}>
             <TranslateIcon width={16} height={16} className={cl("accessory-icon")} />
-            {listening ? "Listening…" : Parser.parse(translation.text)}
+            {pending ? translation.text : Parser.parse(translation.text)}
             <br />
-            {listening
+            {pending
                 ? <>(only you - <Dismiss onDismiss={() => handleTranslate(message.id, undefined)} />)</>
                 : <>(translated from {translation.sourceLanguage} [OpenRouter] - <Dismiss onDismiss={() => handleTranslate(message.id, undefined)} />)</>
             }

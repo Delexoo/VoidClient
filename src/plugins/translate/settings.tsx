@@ -21,10 +21,10 @@ import { Button } from "@components/Button";
 import { openTranslateModal } from "@plugins/translate/TranslateModal";
 import { OptionType } from "@utils/types";
 
-export const DEFAULT_MODEL = "google/gemini-2.5-pro";
+export const DEFAULT_MODEL = "google/gemini-2.5-flash";
 const REPLACED_MODELS = new Set([
+    "google/gemini-2.5-pro",
     "google/gemini-2.5-flash-lite",
-    "google/gemini-2.5-flash",
     "google/gemini-flash-1.5"
 ]);
 
@@ -65,7 +65,7 @@ export const settings = definePluginSettings({
     openrouterModel: {
         type: OptionType.STRING,
         displayName: "OpenRouter model",
-        description: "Used for text, voice, audio, and video. Default is Gemini 2.5 Pro, chosen for accuracy.",
+        description: "Used when you click Translate on a message. Default is Gemini 2.5 Flash so the result shows quickly. Voice, audio, and video stay on Gemini 2.5 Pro.",
         placeholder: DEFAULT_MODEL,
         default: DEFAULT_MODEL
     },

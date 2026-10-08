@@ -470,6 +470,12 @@ function SummaryCard({
     }, [showLang]);
 
     useEffect(() => {
+        const onResize = () => setPos(current => clamp(current.left, current.top));
+        window.addEventListener("resize", onResize);
+        return () => window.removeEventListener("resize", onResize);
+    }, []);
+
+    useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== "Escape") return;
             if (showLang) {

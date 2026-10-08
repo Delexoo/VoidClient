@@ -24,14 +24,6 @@
     container-name: ipa;
 }
 
-.vc-ipa-root.is-ready:not(.is-dragging):not(.is-resizing) {
-    transition:
-        left 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-        top 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-        width 0.24s cubic-bezier(0.22, 1, 0.36, 1),
-        height 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 .vc-ipa-root.is-min {
     min-width: 0;
     min-height: 0;

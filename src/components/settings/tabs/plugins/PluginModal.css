@@ -1,5 +1,36 @@
+.vc-settings-modal-content {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: clip;
+}
+
+.vc-settings-modal-content > section,
+.vc-settings-modal-content > div,
+.vc-plugins-settings {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.vc-settings-modal-content img,
+.vc-settings-modal-content video,
+.vc-settings-modal-content canvas,
+.vc-settings-modal-content iframe {
+    max-width: 100%;
+}
+
 .vc-plugin-modal-header {
     display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.vc-plugin-modal-header > h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .vc-plugin-modal-info {
@@ -7,6 +38,8 @@
     gap: 1em;
     justify-content: space-between;
     align-items: start;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .vc-plugin-modal-tags {

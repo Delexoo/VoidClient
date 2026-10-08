@@ -55,6 +55,7 @@ export async function chatComplete(
                 model: String(model || "").trim(),
                 temperature: 0,
                 max_tokens: 8192,
+                reasoning: { effort: "none" },
                 messages: [
                     { role: "system", content: system },
                     { role: "user", content: user }

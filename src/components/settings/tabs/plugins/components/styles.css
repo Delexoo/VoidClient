@@ -2,12 +2,16 @@
     display: flex;
     flex-direction: column;
     gap: 0.5em;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .vc-plugins-setting-content {
     display: flex;
     flex-direction: column;
     gap: 0.5em;
+    min-width: 0;
+    max-width: 100%;
 }
 
 .vc-plugins-setting-inline {
@@ -20,10 +24,21 @@
     display: flex;
     flex-direction: column;
     gap: 0.25em;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.vc-plugins-setting-inline .vc-plugins-setting-label {
+    flex: 1 1 auto;
 }
 
 .vc-plugins-setting-title {
     color: var(--text-strong);
+}
+
+.vc-plugins-setting-title,
+.vc-plugins-setting-description {
+    overflow-wrap: anywhere;
 }
 
 .vc-plugins-setting-description {

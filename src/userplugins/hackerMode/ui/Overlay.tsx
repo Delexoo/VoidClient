@@ -1903,57 +1903,66 @@ function ExportTab() {
     );
 }
 
+type OverlayBox = { left: number; top: number; width: number; height: number; };
+
+function clampOverlayBox(left: number, top: number, width: number, height: number): OverlayBox {
+    const maxW = Math.max(300, window.innerWidth - 16);
+    const maxH = Math.max(260, window.innerHeight - 16);
+    const w = Math.min(maxW, Math.max(300, width));
+    const h = Math.min(maxH, Math.max(280, height));
+    const l = Math.min(Math.max(8, left), Math.max(8, window.innerWidth - w - 8));
+    const t = Math.min(Math.max(8, top), Math.max(8, window.innerHeight - h - 8));
+    return { left: l, top: t, width: w, height: h };
+}
+
+function defaultOverlayBox(): OverlayBox {
+    const width = Math.min(440, Math.max(320, Math.round(window.innerWidth * 0.32)));
+    const height = Math.min(620, Math.max(380, Math.round(window.innerHeight * 0.62)));
+    return clampOverlayBox(window.innerWidth - width - 16, window.innerHeight - height - 72, width, height);
+}
+
+let rememberedOverlay: OverlayBox | null = null;
+
 function Overlay() {
     const state = useOverlay();
     const boxRef = useRef<HTMLDivElement>(null);
     const drag = useRef<{ x: number; y: number; left: number; top: number; } | null>(null);
-    const [pos, setPos] = useState({ left: 0, top: 0 });
-    const [size, setSize] = useState({ width: 380, height: 520 });
+    const [box, setBox] = useState<OverlayBox>(() => rememberedOverlay ? clampOverlayBox(rememberedOverlay.left, rememberedOverlay.top, rememberedOverlay.width, rememberedOverlay.height) : defaultOverlayBox());
 
     function clampBox(left: number, top: number, width: number, height: number) {
-        const maxW = Math.max(300, window.innerWidth - 16);
-        const maxH = Math.max(260, window.innerHeight - 16);
-        const w = Math.min(maxW, Math.max(300, width));
-        const h = Math.min(maxH, Math.max(280, height));
-        const l = Math.min(Math.max(8, left), Math.max(8, window.innerWidth - w - 8));
-        const t = Math.min(Math.max(8, top), Math.max(8, window.innerHeight - h - 8));
-        return { left: l, top: t, width: w, height: h };
+        return clampOverlayBox(left, top, width, height);
+    }
+
+    function commitBox(next: OverlayBox) {
+        rememberedOverlay = next;
+        setBox(next);
     }
 
     useEffect(() => {
-        const width = Math.min(440, Math.max(320, Math.round(window.innerWidth * 0.32)));
-        const height = Math.min(620, Math.max(380, Math.round(window.innerHeight * 0.62)));
-        const next = clampBox(window.innerWidth - width - 16, window.innerHeight - height - 72, width, height);
-        setSize({ width: next.width, height: next.height });
-        setPos({ left: next.left, top: next.top });
         const onResize = () => {
             const el = boxRef.current;
-            const w = el?.offsetWidth || 380;
-            const h = el?.offsetHeight || 520;
+            const w = el?.offsetWidth || box.width;
+            const h = el?.offsetHeight || box.height;
             const r = el?.getBoundingClientRect();
-            const box = clampBox(r?.left ?? 8, r?.top ?? 8, w, h);
-            setSize({ width: box.width, height: box.height });
-            setPos({ left: box.left, top: box.top });
+            commitBox(clampBox(r?.left ?? box.left, r?.top ?? box.top, w, h));
         };
         window.addEventListener("resize", onResize);
         return () => window.removeEventListener("resize", onResize);
-    }, []);
+    }, [box.left, box.top, box.width, box.height]);
 
     function startResize(e: { preventDefault(): void; stopPropagation(): void; clientX: number; clientY: number; }, dir: "se" | "e" | "s") {
         e.preventDefault();
         e.stopPropagation();
         const startX = e.clientX;
         const startY = e.clientY;
-        const startW = size.width;
-        const startH = size.height;
-        const startL = pos.left;
-        const startT = pos.top;
+        const startW = box.width;
+        const startH = box.height;
+        const startL = box.left;
+        const startT = box.top;
         const move = (ev: MouseEvent) => {
             const nextW = dir === "s" ? startW : startW + ev.clientX - startX;
             const nextH = dir === "e" ? startH : startH + ev.clientY - startY;
-            const box = clampBox(startL, startT, nextW, nextH);
-            setSize({ width: box.width, height: box.height });
-            setPos({ left: box.left, top: box.top });
+            commitBox(clampBox(startL, startT, nextW, nextH));
         };
         const up = () => {
             window.removeEventListener("mousemove", move);
@@ -1980,12 +1989,12 @@ function Overlay() {
             ref={boxRef}
             className={cl("overlay")}
             style={{
-                left: pos.left,
-                top: pos.top,
-                width: size.width,
-                height: size.height,
-                ["--hm-w" as any]: `${size.width}px`,
-                ["--hm-h" as any]: `${size.height}px`
+                left: box.left,
+                top: box.top,
+                width: box.width,
+                height: box.height,
+                ["--hm-w" as any]: `${box.width}px`,
+                ["--hm-h" as any]: `${box.height}px`
             }}
             onMouseDown={e => e.stopPropagation()}
             onPointerDownCapture={() => holdPointer()}
@@ -1996,16 +2005,16 @@ function Overlay() {
                     const node = e.target instanceof Element ? e.target : null;
                     if (node?.closest("button, .vc-hm-head-actions")) return;
                     const rect = boxRef.current?.getBoundingClientRect();
-                    drag.current = { x: e.clientX, y: e.clientY, left: rect?.left ?? pos.left, top: rect?.top ?? pos.top };
+                    drag.current = { x: e.clientX, y: e.clientY, left: rect?.left ?? box.left, top: rect?.top ?? box.top };
                     const move = (ev: MouseEvent) => {
                         if (!drag.current) return;
-                        const box = clampBox(
+                        const next = clampBox(
                             drag.current.left + ev.clientX - drag.current.x,
                             drag.current.top + ev.clientY - drag.current.y,
-                            size.width,
-                            size.height
+                            box.width,
+                            box.height
                         );
-                        setPos({ left: box.left, top: box.top });
+                        commitBox(next);
                     };
                     const up = () => {
                         drag.current = null;

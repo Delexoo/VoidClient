@@ -156,26 +156,35 @@ export async function makeOpenRouterTranslateRequest(
     system: string,
     user: string
 ) {
+    const headers = {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
+        "X-OpenRouter-Title": "Translate"
+    };
+    const messages = [
+        { role: "system", content: system },
+        { role: "user", content: user }
+    ];
+    const send = (skipThinking: boolean) => fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+            model,
+            temperature: 0,
+            max_tokens: 1024,
+            ...(skipThinking ? { reasoning: { effort: "none" } } : {}),
+            messages
+        })
+    });
+
     try {
-        const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
-                "X-OpenRouter-Title": "Translate"
-            },
-            body: JSON.stringify({
-                model,
-                temperature: 0,
-                max_tokens: 4096,
-                messages: [
-                    { role: "system", content: system },
-                    { role: "user", content: user }
-                ]
-            })
-        });
-        const data = await res.text();
+        let res = await send(true);
+        let data = await res.text();
+        if (res.status === 400 && /reasoning/i.test(data)) {
+            res = await send(false);
+            data = await res.text();
+        }
         return { status: res.status, data };
     } catch (e) {
         return { status: -1, data: String(e) };

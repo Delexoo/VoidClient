@@ -26,7 +26,6 @@ import ErrorBoundary from "@components/ErrorBoundary";
 import { debounce } from "@shared/debounce";
 import { gitRemote } from "@shared/vencordUserAgent";
 import { classNameFactory } from "@utils/css";
-import { proxyLazy } from "@utils/lazy";
 import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { OptionType, Plugin, PluginTag } from "@utils/types";
@@ -44,7 +43,6 @@ import { FavoriteButton, GithubButton, WebsiteButton } from "./PluginModalButton
 const cl = classNameFactory("vc-plugin-modal-");
 
 const AvatarStyles = findCssClassesLazy("moreUsers", "avatar", "clickableAvatar");
-const UserRecord: Constructor<Partial<User>> = proxyLazy(() => UserStore.getCurrentUser().constructor) as any;
 
 interface PluginModalProps extends RenderModalProps {
     plugin: Plugin;
@@ -52,20 +50,28 @@ interface PluginModalProps extends RenderModalProps {
 }
 
 function makeDummyUser(user: { username: string; id?: string; avatar?: string; }) {
-    const newUser = new UserRecord({
-        username: user.username,
-        id: user.id ?? generateId(),
-        avatar: user.avatar,
-        /** To stop discord making unwanted requests... */
-        bot: true,
-    });
+    try {
+        const current = UserStore.getCurrentUser?.();
+        const Ctor = current?.constructor as Constructor<Partial<User>> | undefined;
+        if (typeof Ctor !== "function") return null;
 
-    FluxDispatcher.dispatch({
-        type: "USER_UPDATE",
-        user: newUser,
-    });
+        const newUser = new Ctor({
+            username: user.username,
+            id: user.id ?? generateId(),
+            avatar: user.avatar,
+            /** To stop discord making unwanted requests... */
+            bot: true,
+        });
 
-    return newUser;
+        FluxDispatcher.dispatch({
+            type: "USER_UPDATE",
+            user: newUser,
+        });
+
+        return newUser;
+    } catch {
+        return null;
+    }
 }
 
 function PluginTags({ tags }: { tags: PluginTag[]; }) {
@@ -81,26 +87,34 @@ function PluginTags({ tags }: { tags: PluginTag[]; }) {
 export default function PluginModal({ plugin, onRestartNeeded, onClose, transitionState }: PluginModalProps) {
     const pluginSettings = useSettings([`plugins.${plugin.name}.*`]).plugins[plugin.name] ?? {};
     const hasSettings = hasAnyVisibleSettings(plugin);
+    const pluginAuthors = plugin.authors ?? [];
 
-    // avoid layout shift by showing dummy users while loading users
-    const fallbackAuthors = useMemo(() => [makeDummyUser({ username: "Loading...", id: "-1465912127305809920" })], []);
+    const fallbackAuthors = useMemo(() => {
+        const user = makeDummyUser({ username: "Loading...", id: "-1465912127305809920" });
+        return user ? [user] : [];
+    }, []);
     const [authors, setAuthors] = useState<Partial<User>[]>([]);
 
     useEffect(() => {
+        let cancelled = false;
         (async () => {
-            for (const user of plugin.authors.slice(0, 6)) {
+            const next: Partial<User>[] = [];
+            for (const user of pluginAuthors.slice(0, 6)) {
                 try {
                     const author = user.id
                         ? await UserUtils.getUser(String(user.id))
                             .catch(() => makeDummyUser({ username: user.name }))
                         : makeDummyUser({ username: user.name });
-
-                    setAuthors(a => [...a, author]);
-                } catch (e) {
+                    if (author) next.push(author);
+                } catch {
                     continue;
                 }
             }
+            if (!cancelled && next.length) setAuthors(next);
         })();
+        return () => {
+            cancelled = true;
+        };
     }, [plugin.authors]);
 
     function renderSettings() {
@@ -145,12 +159,12 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
     }
 
     function renderMoreUsers(_label: string, count: number) {
-        const sliceCount = plugin.authors.length - count;
-        const sliceStart = plugin.authors.length - sliceCount;
-        const sliceEnd = sliceStart + plugin.authors.length - count;
+        const sliceCount = pluginAuthors.length - count;
+        const sliceStart = pluginAuthors.length - sliceCount;
+        const sliceEnd = sliceStart + pluginAuthors.length - count;
 
         return (
-            <Tooltip text={plugin.authors.slice(sliceStart, sliceEnd).map(u => u.name).join(", ")}>
+            <Tooltip text={pluginAuthors.slice(sliceStart, sliceEnd).map(u => u.name).join(", ")}>
                 {({ onMouseEnter, onMouseLeave }) => (
                     <div
                         className={AvatarStyles.moreUsers}
@@ -204,8 +218,9 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
             <div className={"vc-settings-modal-content"}>
                 <section>
                     <Text variant="heading-lg/semibold" className={classes(Margins.top8, Margins.bottom8)}>Authors</Text>
-                    <div style={{ width: "fit-content" }}>
+                    <div style={{ width: "fit-content", maxWidth: "100%" }}>
                         <ErrorBoundary noop>
+                            {(authors.length ? authors : fallbackAuthors).length > 0 && (
                             <UserSummaryItem
                                 users={authors.length ? authors : fallbackAuthors}
                                 guildId={undefined}
@@ -227,6 +242,7 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
                                     </Clickable>
                                 )}
                             />
+                            )}
                         </ErrorBoundary>
                     </div>
                 </section>
@@ -252,10 +268,12 @@ export default function PluginModal({ plugin, onRestartNeeded, onClose, transiti
 
 export function openPluginModal(plugin: Plugin, onRestartNeeded?: (pluginName: string, key: string) => void) {
     openModal(modalProps => (
-        <PluginModal
-            {...modalProps}
-            plugin={plugin}
-            onRestartNeeded={(key: string) => onRestartNeeded?.(plugin.name, key)}
-        />
+        <ErrorBoundary message="This plugin's settings panel failed to open.">
+            <PluginModal
+                {...modalProps}
+                plugin={plugin}
+                onRestartNeeded={(key: string) => onRestartNeeded?.(plugin.name, key)}
+            />
+        </ErrorBoundary>
     ));
 }

@@ -21,5 +21,6 @@ import { PluginSettingComponentDef } from "@utils/types";
 import { ComponentSettingProps } from "./Common";
 
 export function ComponentSetting({ setting, onChange, closePluginSettings }: ComponentSettingProps<PluginSettingComponentDef>) {
+    if (typeof setting.component !== "function") return null;
     return setting.component({ setValue: onChange, option: setting, closePluginSettings });
 }

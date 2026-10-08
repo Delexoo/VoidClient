@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { app, BrowserWindow, ipcMain, session, type IpcMainInvokeEvent, type WebContents } from "electron";
+import { app, BrowserWindow, ipcMain, screen, session, type IpcMainInvokeEvent, type WebContents } from "electron";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
@@ -160,6 +160,23 @@ function hostWindow(ipc: IpcMainInvokeEvent) {
 
 function liveShell() {
     return shell && !shell.isDestroyed() ? shell : null;
+}
+
+function clampGeom(geom: Geom): Geom {
+    const area = screen.getDisplayMatching({
+        x: geom.x,
+        y: geom.y,
+        width: geom.width,
+        height: geom.height
+    }).workArea;
+    const width = Math.min(Math.max(MIN_W, geom.width), Math.max(MIN_W, area.width - 16));
+    const height = Math.min(Math.max(MIN_H, geom.height), Math.max(MIN_H, area.height - 16));
+    return {
+        x: Math.min(Math.max(area.x, geom.x), area.x + area.width - width),
+        y: Math.min(Math.max(area.y, geom.y), area.y + area.height - height),
+        width,
+        height
+    };
 }
 
 function defaultGeom(parent: BrowserWindow): Geom {
@@ -463,7 +480,7 @@ function wirePage(wc: WebContents, parent: BrowserWindow) {
     wc.on("leave-html-full-screen", () => {
         fullscreen = false;
         const win = liveShell();
-        if (win && restored) win.setBounds(restored);
+        if (win && restored) win.setBounds(clampGeom(restored));
         restored = null;
     });
 }
@@ -525,7 +542,7 @@ function ensureShell(parent: BrowserWindow) {
     wireIpc();
     host = parent;
     const preload = writePreload();
-    const geom = readGeom() || defaultGeom(parent);
+    const geom = clampGeom(readGeom() || defaultGeom(parent));
     shell = new BrowserWindow({
         x: geom.x,
         y: geom.y,

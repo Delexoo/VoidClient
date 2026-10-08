@@ -17,7 +17,7 @@
 */
 
 import { GoogleLanguages } from "@plugins/translate/languages";
-import { DEFAULT_MODEL, settings, translationModel } from "@plugins/translate/settings";
+import { settings, translationModel } from "@plugins/translate/settings";
 import { chatContextBlock } from "@utils/chatContext";
 import { classNameFactory } from "@utils/css";
 import { getOpenRouterKey } from "@utils/openRouterKey";
@@ -157,6 +157,7 @@ function parseApiError(status: number, raw: string) {
     }
 }
 
+const MEDIA_MODEL = "google/gemini-2.5-pro";
 const LAST_RESORT_MODEL = "google/gemini-2.5-flash";
 const AUDIO_BYTE_LIMIT = 15_000_000;
 const VIDEO_BYTE_LIMIT = 20_000_000;
@@ -290,13 +291,11 @@ async function loadBlob(url: string) {
 }
 
 async function hear(call: (model: string) => Promise<string>) {
-    const primary = accurateModel();
     try {
-        return await call(primary);
+        return await call(MEDIA_MODEL);
     } catch (first) {
         const message = String(first);
         if (!/audio|video|modality|unsupported|invalid|format|file/i.test(message)) throw first;
-        if (primary !== DEFAULT_MODEL) return await call(DEFAULT_MODEL);
         return await call(LAST_RESORT_MODEL);
     }
 }
@@ -474,25 +473,34 @@ async function callOpenRouter(apiKey: string, model: string, system: string, tex
         return contentFromResponse(res.data);
     }
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const headers = {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
+        "X-OpenRouter-Title": "Translate"
+    };
+    const messages = [
+        { role: "system", content: system },
+        { role: "user", content: text }
+    ];
+    const send = (skipThinking: boolean) => fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
-        headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-            "HTTP-Referer": "https://github.com/Delexoo/VoidClient",
-            "X-OpenRouter-Title": "Translate"
-        },
+        headers,
         body: JSON.stringify({
             model,
             temperature: 0,
-            max_tokens: 4096,
-            messages: [
-                { role: "system", content: system },
-                { role: "user", content: text }
-            ]
+            max_tokens: 1024,
+            ...(skipThinking ? { reasoning: { effort: "none" } } : {}),
+            messages
         })
     });
-    const body = await res.text();
+
+    let res = await send(true);
+    let body = await res.text();
+    if (res.status === 400 && /reasoning/i.test(body)) {
+        res = await send(false);
+        body = await res.text();
+    }
     if (!res.ok) throw parseApiError(res.status, body).slice(0, 180);
     return contentFromResponse(body);
 }
@@ -512,7 +520,7 @@ async function openRouterTranslate(
     const sourceName = languageName(sourceLang);
     const asked = withChatContext(text, where?.channelId, where?.messageId);
     const system = [
-        "You are a professional translator for Discord chat. Accuracy matters more than speed.",
+        "You are a professional translator for Discord chat. Reply immediately.",
         `Translate the user's message into ${targetName}.`,
         sourceLang && sourceLang !== "auto" ? `The source language is ${sourceName}.` : "Detect the source language.",
         "If nearby messages are included, use them only to resolve names, slang, and what this or that refers to.",

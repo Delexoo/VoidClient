@@ -96,7 +96,8 @@ async function chatComplete(system: string, user: string) {
         body: JSON.stringify({
             model,
             temperature: 0,
-            max_tokens: 4096,
+            max_tokens: 1024,
+            reasoning: { effort: "none" },
             messages: [
                 { role: "system", content: system },
                 { role: "user", content: user }

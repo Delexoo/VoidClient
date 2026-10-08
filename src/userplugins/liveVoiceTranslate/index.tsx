@@ -639,7 +639,7 @@ function listenToggle() {
 }
 
 function applySize(width: number, height: number) {
-    if (!root) return;
+    if (!root || !Number.isFinite(width) || !Number.isFinite(height)) return;
     const collapsed = root.classList.contains("spyt-live-min");
     const w = Math.max(MIN_W, Math.min(window.innerWidth - 12, Math.round(width)));
     const h = Math.max(MIN_H, Math.min(window.innerHeight - 12, Math.round(height)));
@@ -649,7 +649,7 @@ function applySize(width: number, height: number) {
 
 function applyPosition(x: number, y: number) {
     if (!root) return;
-    if (x < 0 || y < 0) return;
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0) return;
     const w = root.offsetWidth || MIN_W;
     const h = root.offsetHeight || MIN_H;
     const maxX = Math.max(0, window.innerWidth - w);

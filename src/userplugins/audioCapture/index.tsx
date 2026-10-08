@@ -573,16 +573,28 @@ function CapturePanel({ anchor }: { anchor: DOMRect | null; }) {
     }, []);
 
     useLayoutEffect(() => {
-        if (!panelRef.current || !anchor) return;
         const el = panelRef.current;
-        const width = el.offsetWidth || 260;
-        const left = Math.min(
-            Math.max(8, Math.round(anchor.left + anchor.width / 2 - width / 2)),
-            window.innerWidth - width - 8
-        );
-        const bottom = Math.round(window.innerHeight - anchor.top + 10);
-        el.style.left = `${left}px`;
-        el.style.bottom = `${bottom}px`;
+        if (!el || !anchor) return;
+
+        const place = () => {
+            const live = document.getElementById(HOST_ID)?.getBoundingClientRect() ?? anchor;
+            const width = el.offsetWidth || 248;
+            const height = el.offsetHeight || 120;
+            const maxLeft = Math.max(8, window.innerWidth - width - 8);
+            const left = Math.min(Math.max(8, Math.round(live.left + live.width / 2 - width / 2)), maxLeft);
+            let top = Math.round(live.top - height - 10);
+            if (top < 8) top = Math.round(live.bottom + 10);
+            const maxTop = Math.max(8, window.innerHeight - height - 8);
+            top = Math.min(Math.max(8, top), maxTop);
+            el.style.left = `${left}px`;
+            el.style.top = `${top}px`;
+            el.style.right = "auto";
+            el.style.bottom = "auto";
+        };
+
+        place();
+        window.addEventListener("resize", place);
+        return () => window.removeEventListener("resize", place);
     }, [anchor, advanced]);
 
     const shortFolder = folder.length > 34 ? `...${folder.slice(-32)}` : folder;

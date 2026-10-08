@@ -74,8 +74,26 @@ export async function translateMessage(message: Message) {
         return;
     }
     if (!content) return;
-    const trans = await translate("received", content, { channelId: message.channel_id, messageId: message.id });
-    handleTranslate(message.id, trans);
+    const saved = cache.get(message.id);
+    if (saved) {
+        handleTranslate(message.id, saved);
+        return;
+    }
+    if (busy.has(message.id)) return;
+
+    busy.add(message.id);
+    const stamp = translationEpoch(message.id);
+    handleTranslate(message.id, { sourceLanguage: "", text: "Translating…" });
+    try {
+        const trans = await translate("received", content, { channelId: message.channel_id, messageId: message.id });
+        if (translationEpoch(message.id) !== stamp) return;
+        cache.set(message.id, trans);
+        handleTranslate(message.id, trans);
+    } catch {
+        if (translationEpoch(message.id) === stamp) handleTranslate(message.id, undefined);
+    } finally {
+        busy.delete(message.id);
+    }
 }
 
 export async function onVoiceHover(src: string, host: HTMLElement) {
